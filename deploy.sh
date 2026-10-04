@@ -64,6 +64,7 @@ toolchain() {
     DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3-venv python3-pip >/dev/null
   fi
   [[ -x "${VENV}/bin/ansible-playbook" ]] || python3 -m venv "${VENV}"
+  export ANSIBLE_COLLECTIONS_PATH="${REPO_ROOT}/.ansible/collections"
   "${VENV}/bin/pip" install --quiet --disable-pip-version-check -r "${REPO_ROOT}/requirements.txt"
   "${VENV}/bin/ansible-galaxy" collection install --upgrade -r "${REPO_ROOT}/ansible/requirements.yml" \
     -p "${REPO_ROOT}/.ansible/collections" >/dev/null

@@ -400,7 +400,7 @@ docs/                        паспорт решения
 
 ```bash
 sudo make destroy               # kubeadm reset + очистка CNI/iptables/hosts; пакеты и пароли сохраняются
-sudo make destroy ANSIBLE_ARGS= # затем можно снова: sudo ./deploy.sh
+sudo ./deploy.sh                # после destroy кластер можно развернуть заново
 sudo make diagnostics           # срез состояния кластера в ./diagnostics (без содержимого секретов)
 sudo ANSIBLE_ARGS="--tags platform" ./deploy.sh   # переприменить только платформу и приложение
 ```

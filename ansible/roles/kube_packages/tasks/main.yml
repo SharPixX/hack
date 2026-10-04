@@ -20,7 +20,8 @@
     name: "{{ kube_packages_list | map('regex_replace', '$', '=' ~ kube_packages_version) | list }}"
     state: present
     allow_change_held_packages: true
-    allow_downgrade: false
+    # converge to the pinned version even if a newer kubectl was preinstalled
+    allow_downgrade: true
 
 - name: Hold Kubernetes packages (upgrades must go through `kubeadm upgrade`)
   ansible.builtin.dpkg_selections:

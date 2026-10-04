@@ -116,13 +116,20 @@ jobs:
             echo "## E2E: kubeadm on $(lsb_release -ds)"
             echo
             echo '```'
-            sed 's/\x1b\[[0-9;]*m//g' smoke.log 2>/dev/null | tail -n 90
+            sed 's/\x1b\[[0-9;]*m//g' smoke.log 2>/dev/null | tail -n 90 || true
             echo '```'
             echo '### Idempotency (second deploy run)'
             echo '```'
-            grep -A3 'PLAY RECAP' deploy-2.log 2>/dev/null
+            grep -A3 'PLAY RECAP' deploy-2.log 2>/dev/null || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish smoke test results as annotations (visible without signing in)
+        if: success()
+        run: |
+          grep -A3 'PLAY RECAP' deploy-2.log > recap.log || true
+          LEVEL=notice ./scripts/ci-annotate.sh recap.log "idempotency: PLAY RECAP of the 2nd deploy" 10
+          LEVEL=notice ./scripts/ci-annotate.sh smoke.log "smoke test" 270
 
       - name: Collect diagnostics
         if: always()

@@ -17,7 +17,7 @@
 
 - name: Install pinned kubelet, kubeadm and kubectl
   ansible.builtin.apt:
-    name: "{{ kube_packages | map('regex_replace', '$', '=' ~ kube_packages_version) | list }}"
+    name: "{{ kube_packages_list | map('regex_replace', '$', '=' ~ kube_packages_version) | list }}"
     state: present
     allow_change_held_packages: true
     allow_downgrade: false
@@ -26,7 +26,7 @@
   ansible.builtin.dpkg_selections:
     name: "{{ item }}"
     selection: hold
-  loop: "{{ kube_packages }}"
+  loop: "{{ kube_packages_list }}"
 
 - name: Enable kubelet (it crash-loops until kubeadm init/join, which is expected)
   ansible.builtin.systemd_service:

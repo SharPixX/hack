@@ -13,6 +13,11 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    # explicit bash => `bash --noprofile --norc -eo pipefail`, so `cmd | tee log` fails when cmd fails
+    shell: bash
+
 env:
   HELM_VERSION: "3.22.0"
   KUBECONFORM_VERSION: "0.8.0"
@@ -27,6 +32,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # full history for the secret scan
 
       - uses: actions/setup-python@v6
         with:
@@ -56,8 +63,8 @@ jobs:
         if: failure()
         run: ./scripts/ci-annotate.sh lint.log "lint" 200
 
-      - name: Secret scan (gitleaks)
-        run: gitleaks dir --redact --verbose .
+      - name: Secret scan of the full Git history (gitleaks)
+        run: gitleaks git --redact --verbose .
 
       - name: Kubernetes misconfiguration scan (trivy, report only)
         run: trivy config --severity HIGH,CRITICAL --exit-code 0 k8s/
@@ -82,6 +89,8 @@ jobs:
             containerd.io moby-engine moby-cli moby-buildx moby-compose moby-containerd moby-runc containerd runc 2>/dev/null || true
           sudo rm -f /usr/local/bin/kubectl /usr/local/bin/helm /usr/local/bin/minikube /usr/local/bin/kind
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          # Docker leaves FORWARD policy DROP behind; a fresh server has ACCEPT
+          sudo iptables -P FORWARD ACCEPT
           df -h /
 
       - name: Deploy (first run)

@@ -184,7 +184,7 @@ target_state() { # prints "<up>/<total>" for a selector
   echo "$up/$all"
 }
 all_targets_up() {
-  local t
+  local t s
   for t in "${TARGETS[@]}"; do
     s=$(target_state "${t#*|}")
     [[ ${s%/*} != 0 && ${s%/*} == "${s#*/}" ]] || return 1

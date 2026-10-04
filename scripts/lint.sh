@@ -89,8 +89,8 @@ config_tests() {
   chmod -R a+rX "$tmp/fluentd"
   echo "  fluentd --dry-run ($fluentd_img)"
   docker run --rm -e OPENSEARCH_HOST=localhost -e OPENSEARCH_PORT=9200 -e OPENSEARCH_SCHEME=http \
-    -v "$tmp/fluentd:/fluentd/etc:ro" "$fluentd_img" \
-    fluentd --dry-run -c /fluentd/etc/fluent.conf -p /fluentd/plugins || return 1
+    -v "$tmp/fluentd:/fluentd/etc:ro" --entrypoint fluentd "$fluentd_img" \
+    --dry-run -c /fluentd/etc/fluent.conf -p /fluentd/plugins || return 1
   rm -rf "$tmp"
 }
 

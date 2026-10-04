@@ -1,0 +1,12 @@
+---
+profile: production
+exclude_paths:
+  - .venv/
+  - .ansible/
+  - .cache/
+  - k8s/
+  - platform/
+  - .github/
+skip_list:
+  # tasks wait on asynchronous Kubernetes state via `until` loops; this is intentional
+  - no-handler

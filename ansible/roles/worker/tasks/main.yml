@@ -1,0 +1,21 @@
+---
+# Multi-node support: joins workers listed in the [workers] inventory group.
+- name: Check whether this node already joined the cluster
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: worker_kubelet_conf
+
+- name: Create a short-lived join command on the control plane
+  ansible.builtin.command: "{{ kubeadm_bin }} token create --ttl 15m --print-join-command"
+  delegate_to: "{{ control_plane_host }}"
+  register: worker_join_command
+  changed_when: true
+  when: not worker_kubelet_conf.stat.exists
+  no_log: true
+
+- name: Join the cluster
+  ansible.builtin.command: "{{ worker_join_command.stdout }} --node-name {{ ansible_facts['nodename'] | lower }}"
+  args:
+    creates: /etc/kubernetes/kubelet.conf
+  when: not worker_kubelet_conf.stat.exists
+  no_log: true

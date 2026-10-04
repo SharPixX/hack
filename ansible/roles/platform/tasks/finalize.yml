@@ -1,0 +1,28 @@
+---
+- name: Read the Gateway address
+  ansible.builtin.command: "{{ platform_kubectl }} -n edge get gateway public -o jsonpath={.status.addresses[0].value}"
+  register: platform_gateway_address_final
+  changed_when: false
+  failed_when: platform_gateway_address_final.stdout | trim | length == 0
+
+- name: Add /etc/hosts entries pointing lab hostnames to the Gateway
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: "# {mark} kube-gateway-lab"
+    block: >-
+      {{ platform_gateway_address_final.stdout | trim }}
+      {{ lab_hostnames | map('regex_replace', '$', '.' ~ lab_domain) | join(' ') }}
+  delegate_to: "{{ item }}"
+  loop: "{{ groups['k8s_cluster'] }}"
+  when: manage_etc_hosts | bool
+
+- name: Deployment summary
+  ansible.builtin.debug:
+    msg:
+      - "Gateway address : {{ platform_gateway_address_final.stdout | trim }}"
+      - "App (HTTP)      : curl http://hello.{{ lab_domain }}/"
+      - "App (HTTPS)     : curl --cacert ca.crt https://hello.{{ lab_domain }}/   (CA: make ca)"
+      - "Grafana         : https://grafana.{{ lab_domain }}   (user admin, password: make credentials)"
+      - "Prometheus      : https://prometheus.{{ lab_domain }}   (basic auth, make credentials)"
+      - "Logs (OSD)      : https://logs.{{ lab_domain }}   (basic auth, make credentials)"
+      - "Verify all      : make verify"

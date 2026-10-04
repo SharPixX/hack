@@ -1,0 +1,39 @@
+---
+- name: Generate the basic-auth password for operator UIs (controller only, mode 0600)
+  ansible.builtin.set_fact:
+    platform_ui_password: >-
+      {{ lookup('ansible.builtin.password', lab_secrets_dir ~ '/ui-basic-auth-password',
+                length=24, chars=['ascii_letters', 'digits']) | trim }}
+  no_log: true
+
+- name: Hash the password in htpasswd SHA format (the format Envoy basic auth supports)
+  ansible.builtin.command:
+    argv: [htpasswd, -nbs, "{{ platform_ui_user }}", "{{ platform_ui_password }}"]
+  register: platform_htpasswd
+  changed_when: false
+  no_log: true
+
+- name: Create basic-auth Secrets referenced by the SecurityPolicies
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ platform_kubectl }} -n {{ item }} create secret generic ui-basic-auth \
+      --from-literal=.htpasswd="${HTPASSWD_LINE}" \
+      --dry-run=client -o yaml | {{ platform_kubectl }} apply -f -
+  args:
+    executable: /bin/bash
+  environment:
+    HTPASSWD_LINE: "{{ platform_htpasswd.stdout | trim }}"
+  loop:
+    - monitoring
+    - logging
+  register: platform_basic_auth
+  changed_when: "'unchanged' not in platform_basic_auth.stdout"
+  no_log: true
+
+- name: Apply monitors, alert rules, Grafana dashboard and UI routes
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/observability"
+  register: platform_observability
+  until: platform_observability.rc == 0
+  retries: 10
+  delay: 6
+  changed_when: platform_observability.stdout_lines | reject('search', ' unchanged$') | list | length > 0

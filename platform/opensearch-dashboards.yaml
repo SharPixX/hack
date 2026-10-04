@@ -1,0 +1,12 @@
+# Helm values: opensearch-project/opensearch-dashboards - UI for searching logs.
+opensearchHosts: "http://opensearch-cluster-master:9200"
+replicaCount: 1
+extraEnvs:
+  - name: DISABLE_SECURITY_DASHBOARDS_PLUGIN
+    value: "true"
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

@@ -1,0 +1,48 @@
+---
+# Lab-wide settings. Override with `-e key=value`, environment-specific group_vars
+# or inventory host vars. Nothing in here is secret: credentials are generated
+# on the control-plane node at deploy time (see `lab_secrets_dir`).
+
+lab_name: kube-gateway-lab
+lab_domain: lab.test # RFC 2606 reserved TLD, never resolves on the Internet
+lab_dir: /opt/kube-gateway-lab # manifests + values synced to the control plane
+lab_secrets_dir: /etc/kube-gateway-lab # generated credentials, mode 0700, never in Git
+
+# --- Cluster -------------------------------------------------------------------
+cluster_name: kube-gateway-lab
+pod_subnet: 10.244.0.0/16
+service_subnet: 10.96.0.0/12
+cluster_dns_domain: cluster.local
+
+# IPv4 used by kubelet/API server. Defaults to the address of the default route.
+node_ip: "{{ ansible_facts['default_ipv4']['address'] }}"
+control_plane_host: "{{ groups['control_plane'][0] }}"
+control_plane_endpoint: "{{ hostvars[control_plane_host]['node_ip'] }}"
+single_node: "{{ (groups['workers'] | default([])) | length == 0 }}"
+
+# --- Edge / Gateway -----------------------------------------------------------------
+# MetalLB L2 pool for the Gateway's LoadBalancer Service.
+# Single node: the node's own IP -> ports 80/443 of the VM *are* the Gateway
+# (same idea as k3s ServiceLB). Multi-node / shared L2: set a free range, e.g.
+#   -e lb_address_pool=192.168.56.240-192.168.56.250
+lb_address_pool: "{{ control_plane_endpoint }}/32"
+
+# Hostnames published through the Gateway (all under lab_domain).
+lab_hostnames:
+  - hello
+  - grafana
+  - prometheus
+  - alertmanager
+  - logs
+
+# Add `<gateway-ip> hello.lab.test ...` to /etc/hosts of cluster nodes.
+manage_etc_hosts: true
+
+# --- Paths / binaries -------------------------------------------------------------
+kubeconfig_path: /etc/kubernetes/admin.conf
+kubectl_bin: /usr/bin/kubectl
+kubeadm_bin: /usr/bin/kubeadm
+helm_bin: /usr/local/bin/helm
+
+# Helm --wait timeout for every release.
+helm_timeout: 10m0s

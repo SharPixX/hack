@@ -1,0 +1,39 @@
+# Shared public Gateway. Only namespaces labelled gateway.lab.test/expose=true
+# may attach routes (cross-namespace delegation with an explicit allow-list).
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: public
+  namespace: edge
+spec:
+  gatewayClassName: envoy-gateway
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway.lab.test/expose: "true"
+    - name: https
+      protocol: HTTPS
+      port: 443
+      hostname: "*.lab.test"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - group: ""
+            kind: Secret
+            name: wildcard-lab-test-tls
+      allowedRoutes:
+        kinds:
+          - kind: HTTPRoute
+        namespaces:
+          from: Selector
+          selector:
+            matchLabels:
+              gateway.lab.test/expose: "true"

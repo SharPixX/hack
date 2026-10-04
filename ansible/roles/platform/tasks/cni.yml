@@ -1,0 +1,39 @@
+---
+- name: Install Calico CNI via tigera-operator
+  kubernetes.core.helm:
+    release_name: calico
+    release_namespace: tigera-operator
+    chart_ref: "{{ charts.calico.name }}"
+    chart_repo_url: "{{ charts.calico.repo }}"
+    chart_version: "{{ charts.calico.version }}"
+    release_values: >-
+      {{ lookup('ansible.builtin.file', platform_values_dir ~ '/calico.yaml') | from_yaml
+         | combine(platform_calico_overrides, recursive=true) }}
+  vars:
+    platform_calico_overrides:
+      installation:
+        controlPlaneReplicas: "{{ 1 if (single_node | bool) else 2 }}"
+        calicoNetwork:
+          ipPools:
+            - name: default-ipv4-ippool
+              cidr: "{{ pod_subnet }}"
+              encapsulation: VXLAN
+              natOutgoing: Enabled
+              nodeSelector: all()
+              blockSize: 26
+
+- name: Wait for Calico to report Available
+  ansible.builtin.command: "{{ platform_kubectl }} wait --for=condition=Available tigerastatus/calico --timeout=20s"
+  register: platform_calico_status
+  until: platform_calico_status.rc == 0
+  retries: 45
+  delay: 10
+  changed_when: false
+
+- name: Wait for all nodes to become Ready
+  ansible.builtin.command: "{{ platform_kubectl }} wait --for=condition=Ready nodes --all --timeout=300s"
+  changed_when: false
+
+- name: Wait for CoreDNS
+  ansible.builtin.command: "{{ platform_kubectl }} -n kube-system rollout status deployment/coredns --timeout=300s"
+  changed_when: false

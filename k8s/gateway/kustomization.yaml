@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Edge layer, owned by the platform team (Gateway API role model):
+#   GatewayClass + EnvoyProxy (infrastructure provider config)
+#   Gateway "edge/public" (cluster operator) shared by app teams via HTTPRoutes
+#   PKI: self-signed root CA -> CA ClusterIssuer -> wildcard cert for *.lab.test
+resources:
+  - envoyproxy.yaml
+  - gatewayclass.yaml
+  - pki.yaml
+  - gateway.yaml
+  - client-traffic-policy.yaml
+  - https-redirect.yaml

@@ -1,0 +1,107 @@
+# Routing for hello.lab.test on the shared Gateway edge/public.
+# Gateway API precedence: longest path prefix wins, then the larger number of
+# header matches, so the rules below do not shadow each other.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hello
+spec:
+  parentRefs:
+    - name: public
+      namespace: edge
+      sectionName: http
+    - name: public
+      namespace: edge
+      sectionName: https
+  hostnames:
+    - hello.lab.test
+  rules:
+    # 1) Header-based canary: "X-Canary: always" pins the request to v2
+    - matches:
+        - headers:
+            - type: Exact
+              name: X-Canary
+              value: always
+      backendRefs:
+        - name: hello-v2
+          port: 80
+
+    # 2) Path-based routing to an explicit version, prefix is stripped
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: hello-v1
+          port: 80
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v2
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: hello-v2
+          port: 80
+
+    # 3) Default: weighted traffic split 90% stable / 10% canary
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      filters:
+        - type: ResponseHeaderModifier
+          responseHeaderModifier:
+            set:
+              - name: X-Served-Via
+                value: envoy-gateway
+      backendRefs:
+        - name: hello-v1
+          port: 80
+          weight: 90
+        - name: hello-v2
+          port: 80
+          weight: 10
+      timeouts:
+        request: 10s
+        backendRequest: 3s
+---
+# Separate route so that a rate limit (BackendTrafficPolicy) applies to /limited only
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hello-limited
+spec:
+  parentRefs:
+    - name: public
+      namespace: edge
+      sectionName: http
+    - name: public
+      namespace: edge
+      sectionName: https
+  hostnames:
+    - hello.lab.test
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /limited
+      filters:
+        - type: URLRewrite
+          urlRewrite:
+            path:
+              type: ReplacePrefixMatch
+              replacePrefixMatch: /
+      backendRefs:
+        - name: hello-v1
+          port: 80

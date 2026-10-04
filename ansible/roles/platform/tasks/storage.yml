@@ -1,0 +1,18 @@
+---
+- name: Install local-path-provisioner (default StorageClass)
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/platform/local-path-storage"
+  register: platform_storage
+  changed_when: platform_storage.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+
+- name: Wait for local-path-provisioner
+  ansible.builtin.command: "{{ platform_kubectl }} -n local-path-storage rollout status deployment/local-path-provisioner --timeout=300s"
+  changed_when: false
+
+- name: Install metrics-server
+  kubernetes.core.helm:
+    release_name: metrics-server
+    release_namespace: kube-system
+    chart_ref: "{{ charts.metrics_server.name }}"
+    chart_repo_url: "{{ charts.metrics_server.repo }}"
+    chart_version: "{{ charts.metrics_server.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/metrics-server.yaml') | from_yaml }}"

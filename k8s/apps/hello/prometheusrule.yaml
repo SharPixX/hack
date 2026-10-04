@@ -1,0 +1,51 @@
+# SLO-style alerts for the demo service, evaluated by Prometheus.
+# Gateway metrics come from Envoy (cluster name "httproute/demo/hello/rule/<n>").
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: hello-slo
+spec:
+  groups:
+    - name: hello.recording
+      interval: 30s
+      rules:
+        - record: hello:gateway_requests:rate1m
+          expr: sum(rate(envoy_cluster_upstream_rq_total{envoy_cluster_name=~"httproute/demo/hello/.*"}[1m]))
+        - record: hello:gateway_errors_5xx:rate1m
+          expr: sum(rate(envoy_cluster_upstream_rq_xx{envoy_cluster_name=~"httproute/demo/hello/.*",envoy_response_code_class="5"}[1m]))
+        - record: hello:gateway_latency_seconds:p95_5m
+          expr: histogram_quantile(0.95, sum by (le) (rate(envoy_cluster_upstream_rq_time_bucket{envoy_cluster_name=~"httproute/demo/hello/.*"}[5m]))) / 1000
+    - name: hello.alerts
+      rules:
+        - alert: HelloUnavailable
+          expr: kube_deployment_status_replicas_available{namespace="demo",deployment="hello-v1"} < 1
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: hello-v1 has no available replicas
+            description: The stable version of the demo service has had 0 ready pods for 2 minutes.
+        - alert: HelloExporterDown
+          expr: absent(up{job="hello"} == 1)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: nginx metrics of the demo service are not being scraped
+        - alert: HelloHigh5xxRatio
+          expr: |
+            (hello:gateway_errors_5xx:rate1m / hello:gateway_requests:rate1m) > 0.05
+            and hello:gateway_requests:rate1m > 0.1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: More than 5% of requests to hello.lab.test fail with 5xx
+            description: '5xx ratio is {{ $value | humanizePercentage }} over the last minute.'
+        - alert: HelloHighLatencyP95
+          expr: hello:gateway_latency_seconds:p95_5m > 0.5
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: p95 upstream latency of hello.lab.test is above 500ms

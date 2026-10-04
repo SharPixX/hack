@@ -1,0 +1,34 @@
+---
+# Vendor-neutral packages from the community-owned pkgs.k8s.io repository.
+- name: Add the Kubernetes apt repository (pkgs.k8s.io, signed)
+  ansible.builtin.deb822_repository:
+    name: kubernetes
+    types: [deb]
+    uris: ["{{ kube_packages_repo }}"]
+    suites: ["/"]
+    signed_by: "{{ kube_packages_repo }}Release.key"
+    state: present
+  register: kube_packages_repo_result
+
+- name: Refresh apt cache after repository change
+  ansible.builtin.apt:
+    update_cache: true
+  when: kube_packages_repo_result is changed
+
+- name: Install pinned kubelet, kubeadm and kubectl
+  ansible.builtin.apt:
+    name: "{{ kube_packages | map('regex_replace', '$', '=' ~ kube_packages_version) | list }}"
+    state: present
+    allow_change_held_packages: true
+    allow_downgrade: false
+
+- name: Hold Kubernetes packages (upgrades must go through `kubeadm upgrade`)
+  ansible.builtin.dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop: "{{ kube_packages }}"
+
+- name: Enable kubelet (it crash-loops until kubeadm init/join, which is expected)
+  ansible.builtin.systemd_service:
+    name: kubelet
+    enabled: true

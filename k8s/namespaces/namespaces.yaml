@@ -1,0 +1,70 @@
+# Pod Security Standards per namespace:
+#   restricted - our own workloads (demo app, Gateway objects, cert-manager)
+#   baseline   - Envoy Gateway data plane
+#   privileged - node agents that need host access (CNI, MetalLB speaker,
+#                node-exporter, Fluentd hostPath log tailing)
+# `gateway.lab.test/expose: "true"` = namespace may attach routes to the public Gateway.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: tigera-operator
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: metallb-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    gateway.lab.test/expose: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: envoy-gateway-system
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/warn: baseline
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cert-manager
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: logging
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
+    gateway.lab.test/expose: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: edge
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    gateway.lab.test/expose: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: demo
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/audit: restricted
+    gateway.lab.test/expose: "true"

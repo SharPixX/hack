@@ -1,0 +1,8 @@
+---
+kube_packages_minor: "{{ kubernetes_version.split('.')[0:2] | join('.') }}"
+kube_packages_repo: "https://pkgs.k8s.io/core:/stable:/v{{ kube_packages_minor }}/deb/"
+kube_packages_version: "{{ kubernetes_version }}-{{ kubernetes_package_revision }}"
+kube_packages:
+  - kubelet
+  - kubeadm
+  - kubectl

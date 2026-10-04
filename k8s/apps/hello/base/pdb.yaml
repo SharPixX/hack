@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hello
+spec:
+  # maxUnavailable (not minAvailable) so the single-replica canary never blocks node drains
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello

@@ -1,0 +1,35 @@
+---
+- name: Read installed Helm version
+  ansible.builtin.command: "{{ helm_bin }} version --template {% raw %}'{{ .Version }}'{% endraw %}"
+  register: helm_installed
+  changed_when: false
+  failed_when: false
+
+- name: Install Helm
+  when: (helm_installed.stdout | default('') | trim) != ('v' ~ helm_version)
+  block:
+    - name: Create Helm unpack directory
+      ansible.builtin.file:
+        path: "/var/cache/kube-gateway-lab/helm-v{{ helm_version }}"
+        state: directory
+        mode: "0755"
+
+    - name: Download Helm release
+      ansible.builtin.get_url:
+        url: "{{ helm_release_url }}"
+        dest: "/var/cache/kube-gateway-lab/helm-v{{ helm_version }}.tar.gz"
+        checksum: "{{ binary_checksums[helm_arch].helm }}"
+        mode: "0644"
+
+    - name: Unpack Helm release
+      ansible.builtin.unarchive:
+        src: "/var/cache/kube-gateway-lab/helm-v{{ helm_version }}.tar.gz"
+        dest: "/var/cache/kube-gateway-lab/helm-v{{ helm_version }}"
+        remote_src: true
+
+    - name: Install the helm binary
+      ansible.builtin.copy:
+        src: "/var/cache/kube-gateway-lab/helm-v{{ helm_version }}/linux-{{ helm_arch }}/helm"
+        dest: "{{ helm_bin }}"
+        remote_src: true
+        mode: "0755"

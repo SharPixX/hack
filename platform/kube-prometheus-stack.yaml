@@ -1,0 +1,102 @@
+# Helm values: prometheus-community/kube-prometheus-stack
+# (Prometheus Operator, Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics).
+# Domain-dependent URLs are injected by Ansible (roles/platform/tasks/monitoring.yml).
+fullnameOverride: kps
+
+crds:
+  enabled: true
+
+defaultRules:
+  create: true
+  rules:
+    windows: false
+
+windowsMonitoring:
+  enabled: false
+
+alertmanager:
+  alertmanagerSpec:
+    replicas: 1
+    retention: 120h
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+
+grafana:
+  enabled: true
+  fullnameOverride: grafana
+  # Admin credentials come from a Secret generated at deploy time (never stored in Git)
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  defaultDashboardsTimezone: browser
+  grafana.ini:
+    analytics:
+      check_for_updates: false
+      reporting_enabled: false
+    users:
+      allow_sign_up: false
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 512Mi
+
+kube-state-metrics:
+  fullnameOverride: kube-state-metrics
+
+prometheus-node-exporter:
+  fullnameOverride: node-exporter
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      memory: 256Mi
+
+# kubeadm control-plane components: metrics endpoints are opened up in the
+# kubeadm config (bind-address 0.0.0.0, etcd listen-metrics-urls :2381).
+kubeEtcd:
+  service:
+    port: 2381
+    targetPort: 2381
+
+prometheus:
+  prometheusSpec:
+    scrapeInterval: 15s
+    evaluationInterval: 15s
+    retention: 7d
+    retentionSize: 8GB
+    # Discover ServiceMonitors/PodMonitors/PrometheusRules in every namespace,
+    # not only the ones labelled for this Helm release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        memory: 2Gi
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests:
+              storage: 10Gi

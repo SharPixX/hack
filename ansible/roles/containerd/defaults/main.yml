@@ -1,0 +1,12 @@
+---
+containerd_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+containerd_checksums: "{{ binary_checksums[containerd_arch] }}"
+containerd_download_dir: /var/cache/kube-gateway-lab
+
+containerd_release_base: "https://github.com/containerd/containerd/releases/download/v{{ containerd_version }}"
+containerd_release_url: "{{ containerd_release_base }}/containerd-{{ containerd_version }}-linux-{{ containerd_arch }}.tar.gz"
+
+containerd_runc_release_url: "https://github.com/opencontainers/runc/releases/download/v{{ runc_version }}/runc.{{ containerd_arch }}"
+
+containerd_cni_release_base: "https://github.com/containernetworking/plugins/releases/download/v{{ cni_plugins_version }}"
+containerd_cni_plugins_release_url: "{{ containerd_cni_release_base }}/cni-plugins-linux-{{ containerd_arch }}-v{{ cni_plugins_version }}.tgz"

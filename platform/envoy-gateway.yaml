@@ -1,0 +1,11 @@
+# Helm values: envoyproxy/gateway-helm (Envoy Gateway controller + Gateway API CRDs).
+# Data-plane (Envoy proxy) settings live in k8s/gateway/envoyproxy.yaml.
+deployment:
+  replicas: 1
+  envoyGateway:
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        memory: 512Mi

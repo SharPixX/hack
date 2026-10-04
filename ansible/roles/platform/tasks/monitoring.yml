@@ -1,0 +1,53 @@
+---
+- name: Generate the Grafana admin password (stored on the controller only, mode 0600)
+  ansible.builtin.set_fact:
+    platform_grafana_password: >-
+      {{ lookup('ansible.builtin.password', lab_secrets_dir ~ '/grafana-admin-password',
+                length=24, chars=['ascii_letters', 'digits']) }}
+  no_log: true
+
+- name: Create the Grafana admin Secret
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ platform_kubectl }} -n monitoring create secret generic grafana-admin \
+      --from-literal=admin-user=admin \
+      --from-literal=admin-password="${GRAFANA_PASSWORD}" \
+      --dry-run=client -o yaml | {{ platform_kubectl }} apply -f -
+  args:
+    executable: /bin/bash
+  environment:
+    GRAFANA_PASSWORD: "{{ platform_grafana_password | trim }}"
+  register: platform_grafana_secret
+  changed_when: "'unchanged' not in platform_grafana_secret.stdout"
+  no_log: true
+
+- name: Install kube-prometheus-stack
+  kubernetes.core.helm:
+    release_name: kps
+    release_namespace: monitoring
+    chart_ref: "{{ charts.kube_prometheus_stack.name }}"
+    chart_repo_url: "{{ charts.kube_prometheus_stack.repo }}"
+    chart_version: "{{ charts.kube_prometheus_stack.version }}"
+    release_values: >-
+      {{ lookup('ansible.builtin.file', platform_values_dir ~ '/kube-prometheus-stack.yaml') | from_yaml
+         | combine(platform_kps_overrides, recursive=true) }}
+  vars:
+    platform_kps_overrides:
+      grafana:
+        grafana.ini:
+          server:
+            root_url: "https://grafana.{{ lab_domain }}"
+      prometheus:
+        prometheusSpec:
+          externalUrl: "https://prometheus.{{ lab_domain }}"
+      alertmanager:
+        alertmanagerSpec:
+          externalUrl: "https://alertmanager.{{ lab_domain }}"
+
+- name: Wait for Prometheus (the StatefulSet is created by the operator)
+  ansible.builtin.command: "{{ platform_kubectl }} -n monitoring rollout status statefulset/prometheus-kps-prometheus --timeout=30s"
+  register: platform_prometheus_rollout
+  until: platform_prometheus_rollout.rc == 0
+  retries: 30
+  delay: 10
+  changed_when: false

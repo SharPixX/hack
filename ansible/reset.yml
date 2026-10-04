@@ -1,0 +1,62 @@
+---
+# Tears the lab down so that `deploy.sh` can start from scratch:
+#   sudo make destroy
+# Keeps installed packages/binaries and generated credentials
+# (add -e purge_secrets=true to delete /etc/kube-gateway-lab as well).
+- name: Reset Kubernetes nodes
+  hosts: k8s_cluster
+  become: true
+  tasks:
+    - name: Check for kubeadm
+      ansible.builtin.stat:
+        path: "{{ kubeadm_bin }}"
+      register: reset_kubeadm
+
+    - name: Run kubeadm reset
+      ansible.builtin.command: "{{ kubeadm_bin }} reset --force --cri-socket unix:///run/containerd/containerd.sock"
+      when: reset_kubeadm.stat.exists
+      changed_when: true
+
+    - name: Remove CNI, kubeconfig, storage and lab state
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/cni/net.d
+        - /root/.kube
+        - /opt/local-path-provisioner
+        - /var/log/fluentd
+        - "{{ lab_dir }}"
+
+    - name: Recreate empty CNI config directory
+      ansible.builtin.file:
+        path: /etc/cni/net.d
+        state: directory
+        mode: "0755"
+
+    - name: Remove Calico/kube-proxy virtual interfaces
+      ansible.builtin.command: "ip link delete {{ item }}"
+      loop: [vxlan.calico, kube-ipvs0]
+      register: reset_links
+      changed_when: reset_links.rc == 0
+      failed_when: false
+
+    - name: Flush iptables rules left by kube-proxy and Calico (as recommended by kubeadm reset)
+      ansible.builtin.shell: |
+        set -o pipefail
+        iptables-save | grep -v -E 'KUBE-|cali-|CNI-' | iptables-restore
+      args:
+        executable: /bin/bash
+      changed_when: true
+
+    - name: Remove /etc/hosts entries
+      ansible.builtin.blockinfile:
+        path: /etc/hosts
+        marker: "# {mark} kube-gateway-lab"
+        state: absent
+
+    - name: Remove generated credentials
+      ansible.builtin.file:
+        path: "{{ lab_secrets_dir }}"
+        state: absent
+      when: purge_secrets | default(false) | bool

@@ -1,0 +1,54 @@
+---
+# Full, idempotent deployment:
+#   1. every node: OS prep, containerd, kubeadm/kubelet/kubectl
+#   2. control plane: `kubeadm init` (only if the cluster does not exist yet)
+#   3. workers: `kubeadm join` (only if the node is not joined yet)
+#   4. platform + apps via Helm/Kustomize from the first control-plane node
+#
+# Re-running the playbook converges to the same state; nothing is recreated.
+# Tags: node, cluster, platform (cni, storage, monitoring, edge, logging, apps, observability, hosts)
+
+- name: Prepare Kubernetes nodes
+  hosts: k8s_cluster
+  become: true
+  any_errors_fatal: true
+  tags: [node]
+  pre_tasks:
+    - name: Check that the OS is supported
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('24.04', '>=')
+        fail_msg: >-
+          {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }} is not supported.
+          This lab is built and tested on Ubuntu 24.04 LTS.
+        quiet: true
+      when: not (allow_unsupported_os | default(false) | bool)
+  roles:
+    - node_prep
+    - kube_packages
+    - containerd
+
+- name: Bootstrap the control plane
+  hosts: control_plane[0]
+  become: true
+  any_errors_fatal: true
+  tags: [cluster]
+  roles:
+    - control_plane
+    - helm
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  tags: [cluster]
+  roles:
+    - worker
+
+- name: Deploy platform, observability and the demo application
+  hosts: control_plane[0]
+  become: true
+  any_errors_fatal: true
+  tags: [platform]
+  roles:
+    - platform

@@ -1,0 +1,33 @@
+---
+- name: Create lab directories
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "{{ item.mode }}"
+  loop:
+    - { path: "{{ lab_dir }}", mode: "0755" }
+    - { path: "{{ lab_dir }}/generated", mode: "0755" }
+    - { path: "{{ lab_secrets_dir }}", mode: "0700" }
+
+- name: Create the secrets directory on the Ansible controller
+  ansible.builtin.file:
+    path: "{{ lab_secrets_dir }}"
+    state: directory
+    mode: "0700"
+  delegate_to: localhost
+
+- name: Sync Kubernetes manifests to the control plane
+  ansible.builtin.copy:
+    src: "{{ platform_repo_root }}/k8s/"
+    dest: "{{ platform_manifests }}/"
+    owner: root
+    group: root
+    mode: "0644"
+    directory_mode: "0755"
+
+- name: Create namespaces (Pod Security levels, Gateway access labels)
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/namespaces"
+  register: platform_namespaces
+  changed_when: platform_namespaces.stdout_lines | reject('search', ' unchanged$') | list | length > 0

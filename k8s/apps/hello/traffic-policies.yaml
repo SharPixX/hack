@@ -1,0 +1,48 @@
+# Envoy Gateway extension policies (Gateway API policy attachment).
+# Resilience for the main route: bounded retries on transient upstream errors
+# plus a circuit breaker.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: hello-resilience
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: hello
+  retry:
+    numRetries: 2
+    retryOn:
+      triggers:
+        - connect-failure
+        - retriable-status-codes
+      httpStatusCodes:
+        - 502
+        - 503
+        - 504
+    perRetry:
+      timeout: 1s
+      backOff:
+        baseInterval: 100ms
+        maxInterval: 1s
+  circuitBreaker:
+    maxConnections: 1024
+    maxPendingRequests: 1024
+    maxParallelRequests: 1024
+---
+# Local (per Envoy replica) rate limit: 5 requests/second on /limited -> HTTP 429
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata:
+  name: hello-rate-limit
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: hello-limited
+  rateLimit:
+    local:
+      rules:
+        - limit:
+            requests: 5
+            unit: Second

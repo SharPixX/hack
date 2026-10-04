@@ -1,0 +1,147 @@
+---
+- name: Install OpenSearch (single node log store)
+  kubernetes.core.helm:
+    release_name: opensearch
+    release_namespace: logging
+    chart_ref: "{{ charts.opensearch.name }}"
+    chart_repo_url: "{{ charts.opensearch.repo }}"
+    chart_version: "{{ charts.opensearch.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/opensearch.yaml') | from_yaml }}"
+
+- name: Install OpenSearch Dashboards
+  kubernetes.core.helm:
+    release_name: opensearch-dashboards
+    release_namespace: logging
+    chart_ref: "{{ charts.opensearch_dashboards.name }}"
+    chart_repo_url: "{{ charts.opensearch_dashboards.repo }}"
+    chart_version: "{{ charts.opensearch_dashboards.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/opensearch-dashboards.yaml') | from_yaml }}"
+
+- name: Read OpenSearch and Dashboards service IPs
+  ansible.builtin.command: "{{ platform_kubectl }} -n logging get svc {{ item }} -o jsonpath={.spec.clusterIP}"
+  register: platform_logging_svc
+  loop:
+    - opensearch-cluster-master
+    - opensearch-dashboards
+  changed_when: false
+
+- name: Remember OpenSearch endpoints
+  ansible.builtin.set_fact:
+    platform_opensearch_url: "http://{{ platform_logging_svc.results[0].stdout }}:9200"
+    platform_dashboards_url: "http://{{ platform_logging_svc.results[1].stdout }}:5601"
+
+- name: Wait for the OpenSearch cluster to be at least yellow
+  ansible.builtin.uri:
+    url: "{{ platform_opensearch_url }}/_cluster/health?wait_for_status=yellow&timeout=10s"
+    status_code: 200
+  register: platform_os_health
+  until: platform_os_health.status == 200
+  retries: 30
+  delay: 10
+
+- name: Create the ISM log retention policy, delete indices after {{ platform_log_retention }}
+  ansible.builtin.uri:
+    url: "{{ platform_opensearch_url }}/_plugins/_ism/policies/logs-retention"
+    method: PUT
+    body_format: json
+    body:
+      policy:
+        description: "Delete log indices older than {{ platform_log_retention }}"
+        default_state: hot
+        states:
+          - name: hot
+            actions: []
+            transitions:
+              - state_name: delete
+                conditions:
+                  min_index_age: "{{ platform_log_retention }}"
+          - name: delete
+            actions:
+              - delete: {}
+            transitions: []
+        ism_template:
+          - index_patterns: "{{ platform_log_indices | map('regex_replace', '$', '-*') | list }}"
+            priority: 100
+    # 409 = policy already exists (idempotent re-run)
+    status_code: [200, 201, 409]
+  changed_when: platform_os_ism.status == 201
+  register: platform_os_ism
+
+- name: Create index templates (typed fields, single shard, no replicas on a single node)
+  ansible.builtin.uri:
+    url: "{{ platform_opensearch_url }}/_index_template/{{ item }}"
+    method: PUT
+    body_format: json
+    body:
+      index_patterns: ["{{ item }}-*"]
+      priority: 100
+      template:
+        settings:
+          number_of_shards: 1
+          number_of_replicas: 0
+          refresh_interval: 5s
+        mappings:
+          properties:
+            "@timestamp": { type: date }
+            status: { type: integer }
+            body_bytes_sent: { type: long }
+            request_time: { type: float }
+            response_code: { type: integer }
+            duration_ms: { type: long }
+            bytes_sent: { type: long }
+            bytes_received: { type: long }
+            uri: { type: text, fields: { keyword: { type: keyword, ignore_above: 2048 } } }
+            path: { type: text, fields: { keyword: { type: keyword, ignore_above: 2048 } } }
+            request_id: { type: keyword }
+            log_type: { type: keyword }
+            app_version: { type: keyword }
+            log: { type: text }
+    status_code: 200
+  loop: "{{ platform_log_indices }}"
+  changed_when: false
+
+- name: Install Fluentd (DaemonSet, RBAC, config, PodMonitor)
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/logging"
+  register: platform_fluentd
+  changed_when: platform_fluentd.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+
+- name: Wait for Fluentd on every node
+  ansible.builtin.command: "{{ platform_kubectl }} -n logging rollout status daemonset/fluentd --timeout=300s"
+  changed_when: false
+
+- name: Wait for OpenSearch Dashboards API
+  ansible.builtin.uri:
+    url: "{{ platform_dashboards_url }}/api/status"
+    status_code: 200
+  register: platform_osd_status
+  until: platform_osd_status.status == 200
+  retries: 40
+  delay: 10
+
+- name: Create Dashboards index patterns (fixed ids, overwrite = idempotent)
+  ansible.builtin.uri:
+    url: "{{ platform_dashboards_url }}/api/saved_objects/index-pattern/{{ item }}?overwrite=true"
+    method: POST
+    headers:
+      osd-xsrf: "true"
+    body_format: json
+    body:
+      attributes:
+        title: "{{ item }}-*"
+        timeFieldName: "@timestamp"
+    status_code: 200
+  loop: "{{ platform_log_indices }}"
+  changed_when: false
+
+- name: Make app-demo-* the default index pattern in Dashboards
+  ansible.builtin.uri:
+    url: "{{ platform_dashboards_url }}/api/opensearch-dashboards/settings"
+    method: POST
+    headers:
+      osd-xsrf: "true"
+    body_format: json
+    body:
+      changes:
+        defaultIndex: app-demo
+    status_code: 200
+  changed_when: false

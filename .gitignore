@@ -1,0 +1,16 @@
+# toolchain created by deploy.sh
+.venv/
+.ansible/
+.cache/
+__pycache__/
+
+# generated at runtime - never commit credentials or cluster artefacts
+*.retry
+lab-ca.crt
+kubeconfig*
+diagnostics/
+deploy-*.log
+smoke.log
+.secrets/
+*.pem
+*.key

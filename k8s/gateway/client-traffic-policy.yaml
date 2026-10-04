@@ -1,0 +1,20 @@
+# Downstream (client-facing) settings of the public Gateway.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: ClientTrafficPolicy
+metadata:
+  name: public-gateway
+  namespace: edge
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: public
+  tls:
+    minVersion: "1.2"
+  headers:
+    # Reject ambiguous headers (header smuggling protection)
+    withUnderscoresAction: RejectRequest
+  timeout:
+    http:
+      requestReceivedTimeout: 30s
+      idleTimeout: 5m

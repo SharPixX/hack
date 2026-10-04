@@ -1,0 +1,68 @@
+---
+# Single source of truth for every pinned version in the lab.
+# Bumping a component = editing this file (+ CHANGELOG), nothing else.
+
+# --- Kubernetes (kubeadm/kubelet/kubectl from pkgs.k8s.io) ----------------
+# v1.36 is the newest minor supported by the whole stack:
+#   Envoy Gateway v1.9 -> k8s 1.33-1.36, Calico v3.32 -> k8s 1.34-1.36.
+kubernetes_version: "1.36.5"
+kubernetes_package_revision: "1.1"
+
+# --- Node runtime (official upstream release binaries, checksum-verified) ----
+containerd_version: "2.2.9"
+runc_version: "1.4.3"
+cni_plugins_version: "1.9.1"
+helm_version: "3.22.0"
+
+# Fallback only: the real value is read from `kubeadm config images list`.
+pause_image_fallback: "registry.k8s.io/pause:3.10.2"
+
+binary_checksums:
+  amd64:
+    containerd: "sha256:a0f8e44adcb8f6cb969938b7f81182577b3c4e1872fc9905b311aae0d944c377"
+    runc: "sha256:f6ae8efc0fa40079e1475e97cbe9d1bd3f106a28d6af78a11d9f1bd565515e60"
+    cni_plugins: "sha256:b98f74a0f8522f0a83867178729c1aa70f2158f90c45a2ca8fa791db1c76b303"
+    helm: "sha256:1e4ab49e429626cf6c6958d914248b78c9730803c2751b87627e171dc800e7bb"
+  arm64:
+    containerd: "sha256:a4ace72f4f80260f39a5ec1c30c8a1c96b0b08b6636efc6ad1a3e0bfa24889d3"
+    runc: "sha256:633301e2e32f8a5ad54031aab4901eb00308bec677dd15faa2751e8f9dab5ca4"
+    cni_plugins: "sha256:56171987d3947707c3563db2f4001bccaf50fd63468611b9f3cbecb1375ee7ec"
+    helm: "sha256:f14e804dfee240f55525b667488fe9adca349e63e00c9af634c0beb1421ac310"
+
+# --- Helm charts ---------------------------------------------------------------
+charts:
+  calico:
+    repo: https://docs.tigera.io/calico/charts
+    name: tigera-operator
+    version: v3.32.2
+  local_path_provisioner:
+    # vendored manifest, see k8s/platform/local-path-storage
+    version: v0.0.37
+  metrics_server:
+    repo: https://kubernetes-sigs.github.io/metrics-server/
+    name: metrics-server
+    version: 3.14.0
+  kube_prometheus_stack:
+    repo: https://prometheus-community.github.io/helm-charts
+    name: kube-prometheus-stack
+    version: 91.9.0
+  metallb:
+    repo: https://metallb.github.io/metallb
+    name: metallb
+    version: 0.16.1
+  envoy_gateway:
+    repo: ""
+    name: oci://docker.io/envoyproxy/gateway-helm
+    version: v1.9.2
+  cert_manager:
+    repo: https://charts.jetstack.io
+    name: cert-manager
+    version: v1.21.2
+  opensearch:
+    repo: https://opensearch-project.github.io/helm-charts/
+    name: opensearch
+    version: 3.9.0
+  opensearch_dashboards:
+    repo: https://opensearch-project.github.io/helm-charts/
+    name: opensearch-dashboards
+    version: 3.9.0

@@ -1,0 +1,28 @@
+---
+- name: Deploy the demo application (v1 + v2, routes, policies, NetworkPolicies, monitoring)
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/apps/hello"
+  register: platform_hello
+  until: platform_hello.rc == 0
+  retries: 10
+  delay: 6
+  changed_when: platform_hello.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+
+- name: Wait for both versions to roll out
+  ansible.builtin.command: "{{ platform_kubectl }} -n demo rollout status deployment/{{ item }} --timeout=300s"
+  loop:
+    - hello-v1
+    - hello-v2
+  changed_when: false
+
+- name: Wait until the Gateway accepted the HTTPRoutes and resolved their backends
+  ansible.builtin.command: >-
+    {{ platform_kubectl }} -n demo get httproute {{ item }}
+    -o 'jsonpath={.status.parents[*].conditions[?(@.type=="Accepted")].status}{","}{.status.parents[*].conditions[?(@.type=="ResolvedRefs")].status}'
+  register: platform_route_status
+  until: "'False' not in platform_route_status.stdout and platform_route_status.stdout.count('True') == 4"
+  retries: 30
+  delay: 5
+  loop:
+    - hello
+    - hello-limited
+  changed_when: false

@@ -1,0 +1,73 @@
+---
+# ------------------------------------------------------------------ MetalLB
+- name: Install MetalLB (L2 mode)
+  kubernetes.core.helm:
+    release_name: metallb
+    release_namespace: metallb-system
+    chart_ref: "{{ charts.metallb.name }}"
+    chart_repo_url: "{{ charts.metallb.repo }}"
+    chart_version: "{{ charts.metallb.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/metallb.yaml') | from_yaml }}"
+
+- name: Render the MetalLB address pool
+  ansible.builtin.template:
+    src: metallb-pool.yaml.j2
+    dest: "{{ lab_dir }}/generated/metallb-pool.yaml"
+    mode: "0644"
+
+- name: Apply the MetalLB address pool (retried until the webhook is serving)
+  ansible.builtin.command: "{{ platform_kubectl }} apply -f {{ lab_dir }}/generated/metallb-pool.yaml"
+  register: platform_metallb_pool
+  until: platform_metallb_pool.rc == 0
+  retries: 20
+  delay: 6
+  changed_when: platform_metallb_pool.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+
+# ------------------------------------------------------------------ Envoy Gateway
+- name: Install Envoy Gateway (controller + Gateway API CRDs)
+  kubernetes.core.helm:
+    release_name: envoy-gateway
+    release_namespace: envoy-gateway-system
+    chart_ref: "{{ charts.envoy_gateway.name }}"
+    chart_version: "{{ charts.envoy_gateway.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/envoy-gateway.yaml') | from_yaml }}"
+
+# ------------------------------------------------------------------ cert-manager
+- name: Install cert-manager
+  kubernetes.core.helm:
+    release_name: cert-manager
+    release_namespace: cert-manager
+    chart_ref: "{{ charts.cert_manager.name }}"
+    chart_repo_url: "{{ charts.cert_manager.repo }}"
+    chart_version: "{{ charts.cert_manager.version }}"
+    release_values: "{{ lookup('ansible.builtin.file', platform_values_dir ~ '/cert-manager.yaml') | from_yaml }}"
+
+# ------------------------------------------------------------------ Gateway API resources
+- name: Apply GatewayClass, EnvoyProxy, PKI and the public Gateway
+  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/gateway"
+  register: platform_gateway
+  until: platform_gateway.rc == 0
+  retries: 20
+  delay: 6
+  changed_when: platform_gateway.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+
+- name: Wait for the wildcard TLS certificate
+  ansible.builtin.command: "{{ platform_kubectl }} -n edge wait --for=condition=Ready certificate/wildcard-lab-test --timeout=300s"
+  changed_when: false
+
+- name: Wait for the GatewayClass to be accepted
+  ansible.builtin.command: "{{ platform_kubectl }} wait --for=condition=Accepted gatewayclass/envoy-gateway --timeout=300s"
+  changed_when: false
+
+- name: Wait for the Gateway to be programmed (Envoy running + LoadBalancer IP assigned)
+  ansible.builtin.command: "{{ platform_kubectl }} -n edge wait --for=condition=Programmed gateway/public --timeout=600s"
+  changed_when: false
+
+- name: Read the Gateway address
+  ansible.builtin.command: "{{ platform_kubectl }} -n edge get gateway public -o jsonpath={.status.addresses[0].value}"
+  register: platform_gateway_address
+  changed_when: false
+
+- name: Remember the Gateway address
+  ansible.builtin.set_fact:
+    platform_gateway_ip: "{{ platform_gateway_address.stdout | trim }}"

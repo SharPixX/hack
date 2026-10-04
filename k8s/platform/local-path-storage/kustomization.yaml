@@ -1,0 +1,48 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Dynamic hostPath PV provisioner (kubeadm ships no StorageClass).
+# upstream-v0.0.37.yaml is vendored verbatim from
+# https://raw.githubusercontent.com/rancher/local-path-provisioner/v0.0.37/deploy/local-path-storage.yaml
+resources:
+  - upstream-v0.0.37.yaml
+patches:
+  # Make it the default StorageClass so PVCs of Prometheus/OpenSearch bind without extra config
+  - target:
+      kind: StorageClass
+      name: local-path
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          storageclass.kubernetes.io/is-default-class: "true"
+  # Helper pods mount hostPath -> privileged PSA level
+  - target:
+      kind: Namespace
+      name: local-path-storage
+    patch: |-
+      - op: add
+        path: /metadata/labels
+        value:
+          pod-security.kubernetes.io/enforce: privileged
+  # Pin the helper image (upstream uses busybox:latest)
+  - target:
+      kind: ConfigMap
+      name: local-path-config
+    patch: |-
+      - op: replace
+        path: /data/helperPod.yaml
+        value: |-
+          apiVersion: v1
+          kind: Pod
+          metadata:
+            name: helper-pod
+          spec:
+            priorityClassName: system-node-critical
+            tolerations:
+              - key: node.kubernetes.io/disk-pressure
+                operator: Exists
+                effect: NoSchedule
+            containers:
+            - name: helper-pod
+              image: docker.io/library/busybox:1.37.0
+              imagePullPolicy: IfNotPresent

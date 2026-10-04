@@ -1,0 +1,9 @@
+---
+# Ansible collections, pinned. Installed by deploy.sh into .ansible/collections.
+collections:
+  - name: kubernetes.core
+    version: 6.6.0
+  - name: ansible.posix
+    version: 2.2.2
+  - name: community.general
+    version: 13.4.0

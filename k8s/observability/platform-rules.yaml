@@ -1,0 +1,48 @@
+# Alerts for the platform components added by this lab (the kube-prometheus-stack
+# chart already ships rules for Kubernetes, node, etcd, Prometheus itself, ...).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: lab-platform
+  namespace: monitoring
+spec:
+  groups:
+    - name: gateway
+      rules:
+        - alert: GatewayProxyDown
+          expr: absent(up{job="envoy-gateway-system/envoy-proxy"} == 1)
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: No Envoy proxy of the public Gateway is being scraped successfully
+        - alert: GatewayCertificateExpiringSoon
+          expr: certmanager_certificate_expiration_timestamp_seconds{name="wildcard-lab-test"} - time() < 7 * 24 * 3600
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: TLS certificate of the Gateway expires in less than 7 days
+    - name: logging
+      rules:
+        - alert: FluentdDown
+          expr: absent(up{job="logging/fluentd"} == 1)
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: No Fluentd agent is running - container logs are not being shipped
+        - alert: FluentdOutputErrors
+          expr: increase(fluentd_output_status_num_errors[10m]) > 0
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Fluentd output {{ $labels.plugin_id }} keeps failing to ship logs to OpenSearch'
+        - alert: FluentdBufferBacklog
+          expr: fluentd_output_status_buffer_queue_length > 20
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: 'Fluentd buffer of {{ $labels.plugin_id }} is growing (OpenSearch slow or down)'

@@ -1,0 +1,60 @@
+# Data-plane configuration for every Gateway of class "envoy-gateway":
+# 2 Envoy replicas behind a LoadBalancer Service (MetalLB), PDB,
+# structured JSON access logs to stdout (-> Fluentd) and Prometheus metrics.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: edge-proxy
+  namespace: envoy-gateway-system
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        replicas: 2
+        container:
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+      envoyService:
+        type: LoadBalancer
+        # keep the real client IP in X-Forwarded-For / access logs
+        externalTrafficPolicy: Local
+      envoyPDB:
+        minAvailable: 1
+  shutdown:
+    drainTimeout: 15s
+  telemetry:
+    metrics:
+      prometheus: {}
+    accessLog:
+      settings:
+        - format:
+            type: JSON
+            json:
+              start_time: "%START_TIME%"
+              request_id: "%REQ(X-REQUEST-ID)%"
+              client_ip: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
+              x_forwarded_for: "%REQ(X-FORWARDED-FOR)%"
+              method: "%REQ(:METHOD)%"
+              authority: "%REQ(:AUTHORITY)%"
+              path: "%REQ(X-ENVOY-ORIGINAL-PATH?:PATH)%"
+              protocol: "%PROTOCOL%"
+              response_code: "%RESPONSE_CODE%"
+              response_flags: "%RESPONSE_FLAGS%"
+              bytes_received: "%BYTES_RECEIVED%"
+              bytes_sent: "%BYTES_SENT%"
+              duration_ms: "%DURATION%"
+              upstream_service_time_ms: "%RESP(X-ENVOY-UPSTREAM-SERVICE-TIME)%"
+              upstream_host: "%UPSTREAM_HOST%"
+              upstream_cluster: "%UPSTREAM_CLUSTER%"
+              route_name: "%ROUTE_NAME%"
+              user_agent: "%REQ(USER-AGENT)%"
+              tls_version: "%DOWNSTREAM_TLS_VERSION%"
+          sinks:
+            - type: File
+              file:
+                path: /dev/stdout

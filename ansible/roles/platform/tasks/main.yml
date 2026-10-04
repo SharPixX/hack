@@ -1,0 +1,47 @@
+---
+# Everything below runs on the first control-plane node with the admin kubeconfig.
+# Helm releases use kubernetes.core.helm (idempotent: compares chart version + values),
+# raw manifests use `kubectl apply -k` (reports "unchanged" on re-runs).
+- name: Deploy the platform
+  module_defaults:
+    kubernetes.core.helm:
+      binary_path: "{{ helm_bin }}"
+      kubeconfig: "{{ kubeconfig_path }}"
+      wait: true
+      timeout: "{{ helm_timeout }}"
+  block:
+    - name: Prepare manifests, namespaces and secrets directory
+      ansible.builtin.import_tasks: prepare.yml
+      tags: [always]
+
+    - name: CNI (Calico)
+      ansible.builtin.import_tasks: cni.yml
+      tags: [cni]
+
+    - name: Storage and resource metrics
+      ansible.builtin.import_tasks: storage.yml
+      tags: [storage]
+
+    - name: Monitoring (kube-prometheus-stack)
+      ansible.builtin.import_tasks: monitoring.yml
+      tags: [monitoring]
+
+    - name: Edge (MetalLB, Envoy Gateway, cert-manager, Gateway)
+      ansible.builtin.import_tasks: edge.yml
+      tags: [edge]
+
+    - name: Logging (OpenSearch, Dashboards, Fluentd)
+      ansible.builtin.import_tasks: logging.yml
+      tags: [logging]
+
+    - name: Demo application
+      ansible.builtin.import_tasks: apps.yml
+      tags: [apps]
+
+    - name: Observability glue (dashboards, alerts, UI routes)
+      ansible.builtin.import_tasks: observability.yml
+      tags: [observability]
+
+    - name: Local name resolution and summary
+      ansible.builtin.import_tasks: finalize.yml
+      tags: [always]

@@ -1,0 +1,47 @@
+---
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ node_prep_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Read active swap devices
+  ansible.builtin.command: swapon --show=NAME --noheadings
+  register: node_prep_swap
+  changed_when: false
+
+- name: Disable swap now (kubelet requirement)
+  ansible.builtin.command: swapoff -a
+  when: node_prep_swap.stdout | length > 0
+  changed_when: true
+
+- name: Disable swap permanently in /etc/fstab
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#\s]+\s+\S+\s+swap\s+.*)$'
+    replace: '# \1  # disabled by kube-gateway-lab'
+
+- name: Persist kernel modules for containerd/Kubernetes networking
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/kubernetes.conf
+    content: "{{ node_prep_kernel_modules | join('\n') }}\n"
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Load kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop: "{{ node_prep_kernel_modules }}"
+
+- name: Apply kernel parameters
+  ansible.posix.sysctl:
+    name: "{{ item.key }}"
+    value: "{{ item.value }}"
+    sysctl_file: /etc/sysctl.d/99-kubernetes.conf
+    sysctl_set: true
+    state: present
+    reload: true
+  loop: "{{ node_prep_sysctl | dict2items }}"

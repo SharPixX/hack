@@ -1,0 +1,16 @@
+# Scrape nginx-prometheus-exporter sidecars of both versions (job="hello").
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: hello
+spec:
+  jobLabel: app.kubernetes.io/name
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hello
+  podTargetLabels:
+    - app.kubernetes.io/version
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

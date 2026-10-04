@@ -1,0 +1,29 @@
+# Helm values: projectcalico/tigera-operator (Calico CNI + NetworkPolicy enforcement).
+# The IP pool (CIDR = pod_subnet) and replica counts are injected by Ansible
+# (roles/platform/tasks/cni.yml) so the pod CIDR is defined in exactly one place.
+installation:
+  enabled: true
+  kubernetesProvider: ""
+  # Calico CSI driver is not needed for this lab
+  kubeletVolumePluginPath: "None"
+  cni:
+    type: Calico
+  calicoNetwork:
+    # VXLAN overlay without BGP: works on any L2/L3 network, incl. cloud VMs and CI runners
+    bgp: Disabled
+    linuxDataplane: Iptables
+
+# Optional Calico components we do not need on a small lab cluster
+apiServer:
+  enabled: false
+goldmane:
+  enabled: false
+whisker:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

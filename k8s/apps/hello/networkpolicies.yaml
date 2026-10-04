@@ -1,0 +1,54 @@
+# Zero-trust networking for the demo namespace (enforced by Calico):
+# everything is denied except traffic from the Gateway data plane and Prometheus.
+# Kubelet probes from the node are always allowed by NetworkPolicy semantics.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-hello
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hello
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        # Envoy proxies of Envoy Gateway run in the controller namespace
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: envoy-gateway-system
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: hello
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: prometheus
+      ports:
+        - protocol: TCP
+          port: 9113

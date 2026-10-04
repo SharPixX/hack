@@ -1,0 +1,86 @@
+---
+- name: Render kubeadm configuration
+  ansible.builtin.template:
+    src: kubeadm-config.yaml.j2
+    dest: "{{ control_plane_kubeadm_config }}"
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Check whether the cluster is already initialised
+  ansible.builtin.stat:
+    path: "{{ kubeconfig_path }}"
+  register: control_plane_admin_conf
+
+- name: Pre-pull control-plane images
+  ansible.builtin.command: "{{ kubeadm_bin }} config images pull --config {{ control_plane_kubeadm_config }}"
+  when: not control_plane_admin_conf.stat.exists
+  changed_when: true
+
+- name: Initialise the cluster with kubeadm
+  ansible.builtin.command: "{{ kubeadm_bin }} init --config {{ control_plane_kubeadm_config }} --skip-token-print"
+  args:
+    creates: "{{ kubeconfig_path }}"
+  register: control_plane_init
+
+- name: Show kubeadm init output
+  ansible.builtin.debug:
+    var: control_plane_init.stdout_lines
+  when: control_plane_init is changed
+
+- name: Create /root/.kube
+  ansible.builtin.file:
+    path: /root/.kube
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+
+- name: Install kubeconfig for root
+  ansible.builtin.copy:
+    src: "{{ kubeconfig_path }}"
+    dest: /root/.kube/config
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0600"
+
+- name: Install kubeconfig for the invoking sudo user
+  when: control_plane_kubeconfig_user | length > 0 and control_plane_kubeconfig_user != 'root'
+  block:
+    - name: Look up the invoking user
+      ansible.builtin.getent:
+        database: passwd
+        key: "{{ control_plane_kubeconfig_user }}"
+
+    - name: Create ~/.kube for the invoking user
+      ansible.builtin.file:
+        path: "{{ ansible_facts['getent_passwd'][control_plane_kubeconfig_user][4] }}/.kube"
+        state: directory
+        owner: "{{ control_plane_kubeconfig_user }}"
+        mode: "0700"
+
+    - name: Copy kubeconfig for the invoking user
+      ansible.builtin.copy:
+        src: "{{ kubeconfig_path }}"
+        dest: "{{ ansible_facts['getent_passwd'][control_plane_kubeconfig_user][4] }}/.kube/config"
+        remote_src: true
+        owner: "{{ control_plane_kubeconfig_user }}"
+        mode: "0600"
+
+- name: Wait for the API server to become ready
+  ansible.builtin.command: "{{ kubectl_bin }} --kubeconfig {{ kubeconfig_path }} get --raw=/readyz"
+  register: control_plane_readyz
+  until: control_plane_readyz.rc == 0
+  retries: 60
+  delay: 5
+  changed_when: false
+
+- name: Make sure the control-plane node accepts workloads on a single-node cluster
+  ansible.builtin.command: >-
+    {{ kubectl_bin }} --kubeconfig {{ kubeconfig_path }}
+    taint nodes --all node-role.kubernetes.io/control-plane:NoSchedule-
+  register: control_plane_untaint
+  changed_when: "'untainted' in control_plane_untaint.stdout"
+  failed_when: control_plane_untaint.rc != 0 and 'not found' not in control_plane_untaint.stderr
+  when: single_node | bool

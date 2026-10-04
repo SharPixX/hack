@@ -1,0 +1,22 @@
+# {{ ansible_managed }}
+# MetalLB L2 pool for LoadBalancer Services (used by the Envoy Gateway proxy Service).
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: gateway-pool
+  namespace: metallb-system
+spec:
+  addresses:
+{% for range in (lb_address_pool is string) | ternary([lb_address_pool], lb_address_pool) %}
+    - {{ range }}
+{% endfor %}
+  autoAssign: true
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: gateway-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+    - gateway-pool

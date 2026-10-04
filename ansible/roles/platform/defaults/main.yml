@@ -1,0 +1,16 @@
+---
+platform_repo_root: "{{ playbook_dir | dirname }}"
+platform_values_dir: "{{ platform_repo_root }}/platform"
+platform_manifests: "{{ lab_dir }}/k8s"
+platform_kubectl: "{{ kubectl_bin }} --kubeconfig {{ kubeconfig_path }}"
+
+# Basic-auth user for Prometheus / Alertmanager / OpenSearch Dashboards behind the Gateway
+platform_ui_user: admin
+
+# OpenSearch: index families written by Fluentd (index templates, ISM retention,
+# Dashboards index patterns are created for each of them)
+platform_log_indices:
+  - app-demo
+  - gateway-access
+  - k8s-logs
+platform_log_retention: 7d

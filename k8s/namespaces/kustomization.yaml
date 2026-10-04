@@ -1,0 +1,6 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# All namespaces of the lab with their Pod Security Admission level and the
+# label that allows attaching HTTPRoutes to the shared Gateway.
+resources:
+  - namespaces.yaml

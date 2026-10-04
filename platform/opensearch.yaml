@@ -1,0 +1,42 @@
+# Helm values: opensearch-project/opensearch - single-node log store for Fluentd.
+# Security plugin is disabled for the lab (see README "Known limitations");
+# the API is reachable only inside the cluster (ClusterIP, no Gateway route).
+clusterName: opensearch-cluster
+nodeGroup: master
+masterService: opensearch-cluster-master
+singleNode: true
+replicas: 1
+protocol: http
+
+opensearchJavaOpts: "-Xms512m -Xmx512m"
+resources:
+  requests:
+    cpu: 250m
+    memory: 1Gi
+  limits:
+    memory: 1536Mi
+
+config:
+  opensearch.yml: |
+    cluster.name: opensearch-cluster
+    network.host: 0.0.0.0
+
+extraEnvs:
+  - name: DISABLE_SECURITY_PLUGIN
+    value: "true"
+  - name: DISABLE_INSTALL_DEMO_CONFIG
+    value: "true"
+
+securityConfig:
+  enabled: false
+
+# vm.max_map_count is configured on the host by Ansible (node_prep role)
+sysctlInit:
+  enabled: false
+
+persistence:
+  enabled: true
+  size: 10Gi
+  # pin the chown init container image (chart default: busybox:latest)
+  image: busybox
+  imageTag: "1.37.0"

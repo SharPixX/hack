@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Stable version. Replicas are owned by the HorizontalPodAutoscaler (min 2, max 5),
+# so the Deployment intentionally has no `spec.replicas`.
+resources:
+  - ../../base
+  - hpa.yaml
+nameSuffix: -v1
+labels:
+  - pairs:
+      app.kubernetes.io/version: v1
+    includeSelectors: true
+    includeTemplates: true
+configMapGenerator:
+  - name: hello-version
+    literals:
+      - version.conf=set $app_version "v1";

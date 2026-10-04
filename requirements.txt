@@ -1,0 +1,3 @@
+# Python tooling for the deployment controller (installed into .venv by deploy.sh)
+ansible-core==2.21.4
+PyYAML>=6.0

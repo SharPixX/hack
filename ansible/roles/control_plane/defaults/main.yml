@@ -1,0 +1,4 @@
+---
+control_plane_kubeadm_config: /etc/kubernetes/kubeadm-config.yaml
+# User that ran `sudo ./deploy.sh`; gets a copy of the admin kubeconfig.
+control_plane_kubeconfig_user: "{{ lookup('ansible.builtin.env', 'SUDO_USER') | default('', true) }}"

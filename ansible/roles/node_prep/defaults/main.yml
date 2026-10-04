@@ -1,0 +1,30 @@
+---
+node_prep_packages:
+  - apt-transport-https
+  - ca-certificates
+  - curl
+  - gpg
+  - jq
+  - conntrack
+  - socat
+  - ethtool
+  - ebtables
+  - ipset
+  - iptables
+  - iproute2
+  - apache2-utils # htpasswd for generated basic-auth secrets
+  - python3-yaml
+
+node_prep_kernel_modules:
+  - overlay
+  - br_netfilter
+
+node_prep_sysctl:
+  net.bridge.bridge-nf-call-iptables: 1
+  net.bridge.bridge-nf-call-ip6tables: 1
+  net.ipv4.ip_forward: 1
+  # OpenSearch (mmapfs) requirement, set on the host instead of a privileged init container
+  vm.max_map_count: 262144
+  # Many pods + Fluentd tailing every container log
+  fs.inotify.max_user_instances: 8192
+  fs.inotify.max_user_watches: 524288

@@ -1,0 +1,11 @@
+# Helm values: kubernetes-sigs/metrics-server (resource metrics API for HPA and `kubectl top`).
+args:
+  # kubeadm kubelets use self-signed serving certificates by default.
+  # Production alternative: serverTLSBootstrap + kubelet-csr-approver.
+  - --kubelet-insecure-tls
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    memory: 256Mi

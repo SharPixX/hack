@@ -73,14 +73,23 @@ config_tests() {
   nginx_img=$(awk '/image: .*nginx-unprivileged/ {print $2}' k8s/apps/hello/base/deployment.yaml)
   fluentd_img=$(awk '/image: .*fluentd-kubernetes-daemonset/ {print $2}' k8s/logging/fluentd.yaml)
   tmp=$(mktemp -d)
+  chmod 755 "$tmp"
   # shellcheck disable=SC2016 # literal nginx variable
   echo 'set $app_version "test";' >"$tmp/version.conf"
+  chmod 644 "$tmp/version.conf"
   echo "  nginx -t ($nginx_img)"
   docker run --rm -v "$PWD/k8s/apps/hello/base/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$tmp:/etc/nginx/app:ro" \
     "$nginx_img" nginx -t || return 1
+  # Offline dry run: drop the kubernetes_metadata filter (needs a live API server) and
+  # skip the OpenSearch version probe (needs a live OpenSearch) - everything else is parsed.
+  mkdir -p "$tmp/fluentd"
+  sed -e '/^<filter kube\.\*\*>/,/^<\/filter>/d' \
+    -e 's/^\(  @type opensearch\)$/\1\n  verify_os_version_at_startup false/' \
+    k8s/logging/fluent.conf >"$tmp/fluentd/fluent.conf"
+  chmod -R a+rX "$tmp/fluentd"
   echo "  fluentd --dry-run ($fluentd_img)"
   docker run --rm -e OPENSEARCH_HOST=localhost -e OPENSEARCH_PORT=9200 -e OPENSEARCH_SCHEME=http \
-    -v "$PWD/k8s/logging:/fluentd/etc:ro" "$fluentd_img" \
+    -v "$tmp/fluentd:/fluentd/etc:ro" "$fluentd_img" \
     fluentd --dry-run -c /fluentd/etc/fluent.conf -p /fluentd/plugins || return 1
   rm -rf "$tmp"
 }

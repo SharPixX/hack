@@ -250,7 +250,7 @@ def page2():
         ["Basic auth на Gateway", "SecurityPolicy + htpasswd-Secret, пароль генерируется при деплое",
          "UI без своей авторизации закрыты", "401 без пароля, 200 с паролем"],
         ["HTTP RED-метрики, дашборд и алерты как код", "Envoy upstream_rq_xx/time, nginx, CPU/RAM; tools/gen-dashboard.py; "
-                                                       "8 своих алертов + recording rules",
+                                                       "9 своих алертов + recording rules",
          "Наблюдаемость по SLO", "Grafana, Prometheus → Alerts"],
         ["Поиск логов и корреляция", "OpenSearch + Dashboards, request_id в логах Envoy и nginx; ISM retention",
          "Расследование инцидентов", "OSD Discover: <font face='Courier'>uri:*probe*</font>"],

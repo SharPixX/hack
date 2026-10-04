@@ -256,7 +256,7 @@ curl -s -o /dev/null -w '%{http_code}\n' --cacert lab-ca.crt https://prometheus.
 
 Готовые артефакты:
 - дашборд Grafana **«kube-gateway-lab: Gateway, App & Logging»** (RPS по классам ответов, 5xx ratio, p50/p95/p99 latency, разбивка canary по версиям, CPU/RAM подов, конвейер Fluentd). Генерируется кодом: [`tools/gen-dashboard.py`](tools/gen-dashboard.py);
-- recording rules и алерты: `HelloUnavailable`, `HelloHigh5xxRatio`, `HelloHighLatencyP95`, `GatewayProxyDown`, `GatewayCertificateExpiringSoon`, `FluentdDown`, `FluentdOutputErrors`, `FluentdBufferBacklog` ([`prometheusrule.yaml`](k8s/apps/hello/prometheusrule.yaml), [`platform-rules.yaml`](k8s/observability/platform-rules.yaml)), а также стандартные правила kube-prometheus-stack.
+- recording rules и 9 своих алертов: `HelloUnavailable`, `HelloExporterDown`, `HelloHigh5xxRatio`, `HelloHighLatencyP95`, `GatewayProxyDown`, `GatewayCertificateExpiringSoon`, `FluentdDown`, `FluentdOutputErrors`, `FluentdBufferBacklog` ([`prometheusrule.yaml`](k8s/apps/hello/prometheusrule.yaml), [`platform-rules.yaml`](k8s/observability/platform-rules.yaml)), а также стандартные правила kube-prometheus-stack.
 
 **Как проверить из CLI** (без port-forward, через service proxy API-сервера):
 

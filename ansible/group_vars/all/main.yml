@@ -38,6 +38,12 @@ lab_hostnames:
 # Add `<gateway-ip> hello.lab.test ...` to /etc/hosts of cluster nodes.
 manage_etc_hosts: true
 
+# --- Container registries ------------------------------------------------------
+# Optional pull-through mirrors, e.g. to avoid Docker Hub anonymous rate limits:
+#   -e '{"containerd_registry_mirrors": {"docker.io": "https://mirror.gcr.io"}}'
+# Empty by default: images are pulled from their upstream registries.
+containerd_registry_mirrors: {}
+
 # --- Paths / binaries -------------------------------------------------------------
 kubeconfig_path: /etc/kubernetes/admin.conf
 kubectl_bin: /usr/bin/kubectl

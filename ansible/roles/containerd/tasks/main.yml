@@ -123,6 +123,25 @@
     containerd_pause_image: "{{ containerd_pause.stdout | default('', true) | trim | default(pause_image_fallback, true) }}"
   notify: Restart containerd
 
+- name: Create per-registry host config directories
+  ansible.builtin.file:
+    path: "/etc/containerd/certs.d/{{ item.key }}"
+    state: directory
+    mode: "0755"
+  loop: "{{ containerd_registry_mirrors | dict2items }}"
+
+- name: Configure registry mirrors (hosts.toml)
+  ansible.builtin.copy:
+    dest: "/etc/containerd/certs.d/{{ item.key }}/hosts.toml"
+    content: |
+      # {{ ansible_managed }}
+      server = "https://{{ 'registry-1.docker.io' if item.key == 'docker.io' else item.key }}"
+
+      [host."{{ item.value }}"]
+        capabilities = ["pull", "resolve"]
+    mode: "0644"
+  loop: "{{ containerd_registry_mirrors | dict2items }}"
+
 - name: Install containerd systemd unit
   ansible.builtin.template:
     src: containerd.service.j2

@@ -158,14 +158,44 @@ else
   fail "Prometheus is not ready"
 fi
 
-prom_query 'sum by (job) (up)' | jq -r '.data.result[] | "\(.metric.job) \(.value[1])"' | sort >"$TMP/up.txt" || true
-prom_query 'count by (job) (up)' | jq -r '.data.result[] | "\(.metric.job) \(.value[1])"' | sort >"$TMP/all.txt" || true
-for job in apiserver kubelet node-exporter kube-state-metrics kube-etcd kube-controller-manager kube-scheduler kube-proxy coredns \
-  hello envoy-gateway-system/envoy-proxy envoy-gateway logging/fluentd cert-manager; do
-  up=$(awk -v j="$job" '$1 == j {print $2}' "$TMP/up.txt")
-  all=$(awk -v j="$job" '$1 == j {print $2}' "$TMP/all.txt")
-  if [[ -n $up && $up != 0 && $up == "$all" ]]; then ok "target job=\"$job\" up ($up/$all)"; else fail "target job=\"$job\" up=${up:-0}/${all:-0}"; fi
+# Scrape targets that must be UP. Monitors applied at the very end of the deployment
+# need a config reload of Prometheus (operator -> secret -> config-reloader), so wait
+# up to ~3 minutes for all of them before judging.
+TARGETS=(
+  "kube-apiserver|up{job=\"apiserver\"}"
+  "kubelet + cAdvisor|up{job=\"kubelet\"}"
+  "etcd|up{job=\"kube-etcd\"}"
+  "kube-controller-manager|up{job=\"kube-controller-manager\"}"
+  "kube-scheduler|up{job=\"kube-scheduler\"}"
+  "kube-proxy|up{job=\"kube-proxy\"}"
+  "CoreDNS|up{job=\"coredns\"}"
+  "node-exporter|up{job=\"node-exporter\"}"
+  "kube-state-metrics|up{job=\"kube-state-metrics\"}"
+  "cert-manager|up{job=\"cert-manager\"}"
+  "hello app (nginx exporter)|up{namespace=\"demo\"}"
+  "Envoy proxies of the Gateway|up{namespace=\"envoy-gateway-system\",pod=~\"envoy-edge-public-.*\"}"
+  "Envoy Gateway controller|up{namespace=\"envoy-gateway-system\",pod=~\"envoy-gateway-.*\"}"
+  "Fluentd|up{namespace=\"logging\",pod=~\"fluentd-.*\"}"
+)
+target_state() { # prints "<up>/<total>" for a selector
+  local up all
+  up=$(prom_query "sum($1)" | jq -r '.data.result[0].value[1] // "0"' 2>/dev/null || echo 0)
+  all=$(prom_query "count($1)" | jq -r '.data.result[0].value[1] // "0"' 2>/dev/null || echo 0)
+  echo "$up/$all"
+}
+all_targets_up() {
+  local t
+  for t in "${TARGETS[@]}"; do
+    s=$(target_state "${t#*|}")
+    [[ ${s%/*} != 0 && ${s%/*} == "${s#*/}" ]] || return 1
+  done
+}
+retry 18 10 all_targets_up || true
+for t in "${TARGETS[@]}"; do
+  s=$(target_state "${t#*|}")
+  if [[ ${s%/*} != 0 && ${s%/*} == "${s#*/}" ]]; then ok "target ${t%%|*} up ($s)"; else fail "target ${t%%|*} up=$s  [${t#*|}]"; fi
 done
+info "scrape jobs: $(prom_query 'sum by (job) (up)' | jq -r '[.data.result[] | "\(.metric.job)=\(.value[1])"] | join(" ")' 2>/dev/null || true)"
 
 check_metric() {
   local desc=$1 q=$2 val

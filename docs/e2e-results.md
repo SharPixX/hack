@@ -1,7 +1,7 @@
 # Результаты e2e-проверки на Ubuntu 24.04
 
 Источник: GitHub Actions, workflow `ci`, job **«E2E - kubeadm cluster on Ubuntu 24.04»**,
-[run #11, job E2E](https://github.com/SharPixX/hack/actions/runs/37207121486/job/111450524222) (коммит `0477d13`), 2026-10-04.
+[run #13](https://github.com/SharPixX/hack/actions/runs/37208862985) (коммит `833de5e`, оба job — lint и e2e — зелёные), 2026-10-04.
 Раннер: чистая ВМ `ubuntu-24.04` (Ubuntu 24.04 LTS, x86_64, 4 vCPU, 16 GB RAM).
 Этот же сценарий выполняется на каждый push в `main` — актуальный статус показывает бейдж в README.
 
@@ -45,7 +45,7 @@ tasks reported as changed on the 2nd run: (none)
 
 == Gateway API (Envoy Gateway)
   [PASS] GatewayClass envoy-gateway Accepted
-  [PASS] Gateway edge/public Programmed, address 10.1.0.196
+  [PASS] Gateway edge/public Programmed, address 10.1.1.138
   [PASS] HTTPRoute demo/hello Accepted, refs resolved
   [PASS] HTTPRoute demo/hello-limited Accepted, refs resolved
   [PASS] HTTPRoute edge/https-redirect Accepted, refs resolved
@@ -82,19 +82,19 @@ tasks reported as changed on the 2nd run: (none)
   [PASS] target Envoy proxies of the Gateway up (2/2)
   [PASS] target Envoy Gateway controller up (1/1)
   [PASS] target Fluentd up (1/1)
-         scrape jobs: kubelet=3 kube-state-metrics=1 kube-proxy=1 coredns=2 kps-alertmanager=2 grafana=1 apiserver=1 kube-etcd=1 kube-scheduler=1 node-exporter=1 kps-prometheus=2 kps-operator=1 kube-controller-manager=1 metallb-controller-monitor-service=1 cert-manager=1 metallb=1 webhook=1 cainjector=1 envoy-gateway-system/envoy-proxy=2 logging/fluentd=1 hello=3 envoy-gateway=1
-  [PASS] gateway requests to demo (envoy_cluster_upstream_rq_total) = 262
-  [PASS] gateway 5xx responses (envoy_cluster_upstream_rq_xx{class=5}) = 20
-  [PASS] nginx requests (nginx_http_requests_total) = 526
-  [PASS] Fluentd shipped records (fluentd_output_status_emit_records) = 10038
+         scrape jobs: kps-operator=1 kubelet=3 coredns=2 node-exporter=1 grafana=1 kps-alertmanager=2 kube-etcd=1 kube-controller-manager=1 apiserver=1 kube-scheduler=1 kps-prometheus=2 kube-proxy=1 kube-state-metrics=1 metallb-controller-monitor-service=1 metallb=1 webhook=1 cert-manager=1 cainjector=1 hello=3 logging/fluentd=1 envoy-gateway-system/envoy-proxy=2 envoy-gateway=1
+  [PASS] gateway requests to demo (envoy_cluster_upstream_rq_total) = 399
+  [PASS] gateway 5xx responses (envoy_cluster_upstream_rq_xx{class=5}) = 34
+  [PASS] nginx requests (nginx_http_requests_total) = 605
+  [PASS] Fluentd shipped records (fluentd_output_status_emit_records) = 10101
   [PASS] recording rule hello:gateway_requests:rate1m = 5.466666666666666
   [PASS] custom alerting/recording rule groups loaded: 4 (alerts currently active: 0)
 == Logging (Fluentd -> OpenSearch)
-         sent requests tagged with marker smoke179112272229673, waiting for them in OpenSearch...
-  [PASS] nginx ACCESS log found in index app-demo-*: {"@timestamp":"2026-10-04T14:05:22.986184652+00:00","method":"GET","uri":"/?probe=smoke179112272229673","status":200,"app_version":"v1","pod":"hello-v1-8689f55bc4-knnw4"}
-  [PASS] nginx ERROR log found in index app-demo-*: 2026/10/04 14:05:22 [error] 21#21: *80 access forbidden by rule, client: 10.244.159.86, server: _, request: "GET /stub_status?probe=smoke179
-  [PASS] Envoy Gateway access log found in index gateway-access-*: {"authority":"hello.lab.test","path":"/?probe=smoke179112272229673","response_code":200,"upstream_cluster":"httproute/demo/hello/rule/3","request_id":"131ecd5b-dfda-4f6c-b9f4-4c74e8eebb1b"}
-         indices: .kibana_1 4 .plugins-ml-config 1 app-demo-2026.10.04 556 gateway-access-2026.10.04 580 k8s-logs-2026.10.04 8441 top_queries-2026.10.04-59463 8
+         sent requests tagged with marker smoke179112452315734, waiting for them in OpenSearch...
+  [PASS] nginx ACCESS log found in index app-demo-*: {"@timestamp":"2026-10-04T14:35:23.395018711+00:00","method":"GET","uri":"/?probe=smoke179112452315734","status":200,"app_version":"v1","pod":"hello-v1-8689f55bc4-29cgs"}
+  [PASS] nginx ERROR log found in index app-demo-*: 2026/10/04 14:35:23 [error] 22#22: *93 access forbidden by rule, client: 10.244.159.87, server: _, request: "GET /stub_status?probe=smoke179
+  [PASS] Envoy Gateway access log found in index gateway-access-*: {"authority":"hello.lab.test","path":"/?probe=smoke179112452315734","response_code":200,"upstream_cluster":"httproute/demo/hello/rule/3","request_id":"64060b6d-ac57-4f34-8a55-3b707710dfa9"}
+         indices: .kibana_1 4 .plugins-ml-config 1 app-demo-2026.10.04 556 gateway-access-2026.10.04 580 k8s-logs-2026.10.04 8467 top_queries-2026.10.04-59463 8
 
 == Result
   56 passed, 0 failed

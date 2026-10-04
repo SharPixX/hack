@@ -68,6 +68,16 @@
     - /opt/cni/bin
     - /etc/cni/net.d
 
+- name: Remove default bridge CNI configs of other runtimes (podman, containerd examples)
+  # they would be picked up by kubelet before Calico writes 10-calico.conflist
+  ansible.builtin.file:
+    path: "/etc/cni/net.d/{{ item }}"
+    state: absent
+  loop:
+    - 87-podman-bridge.conflist
+    - 87-podman.conflist
+    - 10-containerd-net.conflist
+
 - name: Read installed CNI plugins version marker
   ansible.builtin.slurp:
     src: /opt/cni/bin/.kube-gateway-lab-version

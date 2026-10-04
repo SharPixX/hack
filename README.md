@@ -319,7 +319,7 @@ index pattern `app-demo-*` (выбран по умолчанию) и выпол�
   - секреты генерируются один раз (lookup `password` в `/etc/kube-gateway-lab`, режим 0600) и при повторе не меняются;
   - CI запускает деплой **дважды подряд** на одной машине и прогоняет smoke-test после второго запуска.
 - **CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)):**
-  1. `lint`: yamllint, shellcheck, ansible-lint (profile *production*), `helm template` всех чартов с нашими values, `kustomize build` + **kubeconform -strict** по схемам Kubernetes **и схемам, сгенерированным из CRD закреплённых версий чартов** ([`tools/crd2schema.py`](tools/crd2schema.py)): опечатка в поле `HTTPRoute` или `BackendTrafficPolicy` валит сборку; gitleaks (секреты); trivy config (мисконфигурации, отчёт);
+  1. `lint`: yamllint, shellcheck, ansible-lint (profile *production*), `helm template` всех чартов с нашими values, `kustomize build` + **kubeconform -strict** по схемам Kubernetes **и схемам, сгенерированным из CRD закреплённых версий чартов** ([`tools/crd2schema.py`](tools/crd2schema.py)): опечатка в поле `HTTPRoute` или `BackendTrafficPolicy` валит сборку; `nginx -t` и `fluentd --dry-run` внутри тех же образов, что работают в кластере; gitleaks по всей истории Git (секреты); trivy config (мисконфигурации, отчёт);
   2. `e2e`: на чистом раннере **ubuntu-24.04** выполняются `deploy.sh` → повторный `deploy.sh` → `smoke-test.sh`. Итог попадает в Job Summary, полная диагностика (поды, события, таргеты Prometheus, индексы OpenSearch, логи) сохраняется как artifact.
 
 ## 9. Безопасность и надёжность

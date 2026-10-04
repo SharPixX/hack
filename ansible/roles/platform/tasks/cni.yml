@@ -1,4 +1,24 @@
 ---
+# Upstream procedure for Calico >= 3.31: CRDs come from a separate chart and are
+# applied server-side (they are too large for client-side apply annotations).
+- name: Check whether the Calico CRDs are already installed
+  ansible.builtin.command: "{{ platform_kubectl }} get crd installations.operator.tigera.io"
+  register: platform_calico_crds_present
+  changed_when: false
+  failed_when: false
+
+- name: Install Calico CRDs (helm template | kubectl apply --server-side)
+  ansible.builtin.shell: |
+    set -o pipefail
+    {{ helm_bin }} template calico-crds crd.projectcalico.org.v1 \
+      --repo {{ charts.calico.repo }} --version {{ charts.calico.version }} \
+      | {{ platform_kubectl }} apply --server-side --force-conflicts -f -
+  args:
+    executable: /bin/bash
+  register: platform_calico_crds
+  # server-side apply is idempotent; report a change only on the first installation
+  changed_when: platform_calico_crds_present.rc != 0
+
 - name: Install Calico CNI via tigera-operator
   kubernetes.core.helm:
     release_name: calico

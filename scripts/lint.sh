@@ -67,6 +67,24 @@ kubeconform_all() {
   return $rc
 }
 
+# Config tests inside the exact images that run in the cluster (needs Docker; CI has it)
+config_tests() {
+  local nginx_img fluentd_img tmp
+  nginx_img=$(awk '/image: .*nginx-unprivileged/ {print $2}' k8s/apps/hello/base/deployment.yaml)
+  fluentd_img=$(awk '/image: .*fluentd-kubernetes-daemonset/ {print $2}' k8s/logging/fluentd.yaml)
+  tmp=$(mktemp -d)
+  # shellcheck disable=SC2016 # literal nginx variable
+  echo 'set $app_version "test";' >"$tmp/version.conf"
+  echo "  nginx -t ($nginx_img)"
+  docker run --rm -v "$PWD/k8s/apps/hello/base/nginx.conf:/etc/nginx/nginx.conf:ro" -v "$tmp:/etc/nginx/app:ro" \
+    "$nginx_img" nginx -t || return 1
+  echo "  fluentd --dry-run ($fluentd_img)"
+  docker run --rm -e OPENSEARCH_HOST=localhost -e OPENSEARCH_PORT=9200 -e OPENSEARCH_SCHEME=http \
+    -v "$PWD/k8s/logging:/fluentd/etc:ro" "$fluentd_img" \
+    fluentd --dry-run -c /fluentd/etc/fluent.conf -p /fluentd/plugins || return 1
+  rm -rf "$tmp"
+}
+
 run "yamllint" yamllint -s .
 run "shellcheck" shellcheck -x deploy.sh scripts/*.sh
 if [[ "${SKIP_ANSIBLE_LINT:-0}" != "1" ]]; then
@@ -75,6 +93,11 @@ fi
 run "CRD schemas from pinned charts" crd_schemas
 run "helm template with our values" helm_values
 run "kustomize build + kubeconform" kubeconform_all
+if command -v docker >/dev/null && docker info >/dev/null 2>&1; then
+  run "nginx/fluentd config tests in the deployed images" config_tests
+else
+  step "nginx/fluentd config tests skipped (no Docker)"
+fi
 
 if ((${#FAILED[@]})); then
   printf '\n\e[31mLint failed:\e[0m %s\n' "${FAILED[*]}"

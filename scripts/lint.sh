@@ -95,7 +95,7 @@ config_tests() {
 }
 
 run "yamllint" yamllint -s .
-run "shellcheck" shellcheck -x deploy.sh scripts/*.sh
+run "shellcheck" shellcheck -x deploy.sh scripts/*.sh ansible/roles/platform/files/*.sh
 if [[ "${SKIP_ANSIBLE_LINT:-0}" != "1" ]]; then
   run "ansible-lint" env ANSIBLE_CONFIG=ansible/ansible.cfg ansible-lint --profile production ansible/site.yml ansible/reset.yml
 fi

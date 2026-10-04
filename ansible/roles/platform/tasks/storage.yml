@@ -1,8 +1,10 @@
 ---
 - name: Install local-path-provisioner (default StorageClass)
-  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/platform/local-path-storage"
+  ansible.builtin.command: "{{ platform_apply }} {{ platform_manifests }}/platform/local-path-storage"
+  environment:
+    KUBECTL: "{{ platform_kubectl }}"
   register: platform_storage
-  changed_when: platform_storage.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+  changed_when: "'NO_CHANGES' not in platform_storage.stdout"
 
 - name: Wait for local-path-provisioner
   ansible.builtin.command: "{{ platform_kubectl }} -n local-path-storage rollout status deployment/local-path-provisioner --timeout=300s"

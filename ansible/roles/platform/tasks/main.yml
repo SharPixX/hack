@@ -1,7 +1,7 @@
 ---
 # Everything below runs on the first control-plane node with the admin kubeconfig.
 # Helm releases use kubernetes.core.helm (idempotent: compares chart version + values),
-# raw manifests use `kubectl apply -k` (reports "unchanged" on re-runs).
+# raw manifests use `kubectl apply -k` behind `kubectl diff` (files/kube-apply.sh), so re-runs report no change.
 - name: Deploy the platform
   module_defaults:
     kubernetes.core.helm:

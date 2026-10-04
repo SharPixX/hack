@@ -101,9 +101,11 @@
   changed_when: false
 
 - name: Install Fluentd (DaemonSet, RBAC, config, PodMonitor)
-  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/logging"
+  ansible.builtin.command: "{{ platform_apply }} {{ platform_manifests }}/logging"
+  environment:
+    KUBECTL: "{{ platform_kubectl }}"
   register: platform_fluentd
-  changed_when: platform_fluentd.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+  changed_when: "'NO_CHANGES' not in platform_fluentd.stdout"
 
 - name: Wait for Fluentd on every node
   ansible.builtin.command: "{{ platform_kubectl }} -n logging rollout status daemonset/fluentd --timeout=300s"

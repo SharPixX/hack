@@ -1,11 +1,13 @@
 ---
 - name: Deploy the demo application (v1 + v2, routes, policies, NetworkPolicies, monitoring)
-  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/apps/hello"
+  ansible.builtin.command: "{{ platform_apply }} {{ platform_manifests }}/apps/hello"
+  environment:
+    KUBECTL: "{{ platform_kubectl }}"
   register: platform_hello
   until: platform_hello.rc == 0
   retries: 10
   delay: 6
-  changed_when: platform_hello.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+  changed_when: "'NO_CHANGES' not in platform_hello.stdout"
 
 - name: Wait for both versions to roll out
   ansible.builtin.command: "{{ platform_kubectl }} -n demo rollout status deployment/{{ item }} --timeout=300s"

@@ -9,6 +9,7 @@
   loop:
     - { path: "{{ lab_dir }}", mode: "0755" }
     - { path: "{{ lab_dir }}/generated", mode: "0755" }
+    - { path: "{{ lab_dir }}/bin", mode: "0755" }
     - { path: "{{ lab_secrets_dir }}", mode: "0700" }
 
 - name: Create the secrets directory on the Ansible controller
@@ -17,6 +18,14 @@
     state: directory
     mode: "0700"
   delegate_to: localhost
+
+- name: Install the idempotent apply helper
+  ansible.builtin.copy:
+    src: kube-apply.sh
+    dest: "{{ platform_apply }}"
+    owner: root
+    group: root
+    mode: "0755"
 
 - name: Sync Kubernetes manifests to the control plane
   ansible.builtin.copy:
@@ -28,6 +37,8 @@
     directory_mode: "0755"
 
 - name: Create namespaces (Pod Security levels, Gateway access labels)
-  ansible.builtin.command: "{{ platform_kubectl }} apply -k {{ platform_manifests }}/namespaces"
+  ansible.builtin.command: "{{ platform_apply }} {{ platform_manifests }}/namespaces"
+  environment:
+    KUBECTL: "{{ platform_kubectl }}"
   register: platform_namespaces
-  changed_when: platform_namespaces.stdout_lines | reject('search', ' unchanged$') | list | length > 0
+  changed_when: "'NO_CHANGES' not in platform_namespaces.stdout"

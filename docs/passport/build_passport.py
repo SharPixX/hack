@@ -164,7 +164,7 @@ def page1():
     s = [Paragraph("Паспорт решения: kube-gateway-lab", H1),
          Paragraph(f"Репозиторий: <font color='#1d4ed8'>{REPO}</font> (ветка main). Развёртывание одной командой "
                    "<font face='Courier'>sudo ./deploy.sh</font> на чистой Ubuntu 24.04; в конце автоматически "
-                   "выполняется сквозной smoke-test (~40 проверок).", P),
+                   "выполняется сквозной smoke-test (55 проверок).", P),
          Paragraph("1. Архитектура и состав решения", H2)]
     rows = [
         ["Параметр", "Значение"],
@@ -182,7 +182,9 @@ def page1():
                                            "Prometheus, Alertmanager, Grafana, node-exporter, kube-state-metrics; "
                                            "таргеты — ServiceMonitor/PodMonitor"],
         ["ОС, на которой тестировалось", "<b>Ubuntu 24.04 LTS</b>: e2e-деплой на чистом раннере GitHub Actions ubuntu-24.04 "
-                                         "(x86_64, 4 vCPU/16 GB) на каждый push — двойной прогон + smoke-test"],
+                                         "(x86_64, 4 vCPU/16 GB) на каждый push — двойной прогон + smoke-test. "
+                                         "Результат: <b>55/55 проверок PASS</b>, повторный деплой failed=0 "
+                                         "(docs/e2e-results.md)"],
     ]
     s.append(table(rows, [44 * mm, 136 * mm]))
     s.append(Spacer(1, 5))

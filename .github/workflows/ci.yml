@@ -127,8 +127,12 @@ jobs:
       - name: Publish smoke test results as annotations (visible without signing in)
         if: success()
         run: |
-          grep -A3 'PLAY RECAP' deploy-2.log > recap.log || true
-          LEVEL=notice ./scripts/ci-annotate.sh recap.log "idempotency: PLAY RECAP of the 2nd deploy" 10
+          {
+            grep -A3 'PLAY RECAP' deploy-2.log || true
+            echo "tasks reported as changed on the 2nd run:"
+            awk '/^TASK \[/ {t=$0} /^changed:/ {print "  " t}' deploy-2.log | sort -u || true
+          } > recap.log
+          LEVEL=notice ./scripts/ci-annotate.sh recap.log "idempotency: PLAY RECAP of the 2nd deploy" 30
           LEVEL=notice ./scripts/ci-annotate.sh smoke.log "smoke test" 270
 
       - name: Collect diagnostics

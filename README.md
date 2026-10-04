@@ -9,14 +9,15 @@ Kubernetes-кластер на **kubeadm** разворачивается с н�
 
 ```bash
 git clone https://github.com/SharPixX/hack.git && cd hack
-sudo ./deploy.sh          # ≈15–20 минут: кластер, платформа, приложение и проверка
+sudo ./deploy.sh          # ≈12–20 минут (зависит от сети): кластер, платформа, приложение и проверка
 ```
 
-Последний шаг `deploy.sh` запускает сквозной smoke-test (`make verify`, около 40 проверок):
+Последний шаг `deploy.sh` запускает сквозной smoke-test (`make verify`, 55 проверок):
 Gateway API, TLS, canary, rate limit, цели и запросы Prometheus, а также доставку конкретного
 HTTP-запроса в OpenSearch. Тот же сценарий на каждый push выполняется в GitHub Actions на
 раннере **ubuntu-24.04**: два деплоя подряд (проверка идемпотентности), затем smoke-test.
-Логи прогонов лежат во вкладке [Actions](https://github.com/SharPixX/hack/actions).
+Результат последнего прогона — **55/55 PASS, повторный деплой `failed=0`**. Полный вывод:
+[`docs/e2e-results.md`](docs/e2e-results.md), прогоны: вкладка [Actions](https://github.com/SharPixX/hack/actions).
 
 ---
 

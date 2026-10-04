@@ -16,12 +16,45 @@
   loop: "{{ groups['k8s_cluster'] }}"
   when: manage_etc_hosts | bool
 
+- name: Read the lab root CA certificate (public part only)
+  ansible.builtin.command: "{{ platform_kubectl }} -n cert-manager get secret lab-root-ca -o 'jsonpath={.data.ca\\.crt}'"
+  register: platform_lab_ca
+  changed_when: false
+
+- name: Save the lab root CA for clients (curl --cacert)
+  ansible.builtin.copy:
+    content: "{{ platform_lab_ca.stdout | b64decode }}"
+    dest: "{{ lab_dir }}/lab-ca.crt"
+    mode: "0644"
+
+# Readiness barrier: the deployment is finished only when Envoy really serves every
+# published host with the expected answer (routes/policies arrive over xDS asynchronously).
+- name: Wait until the Gateway serves every published host
+  ansible.builtin.uri:
+    url: "{{ item.url }}"
+    ca_path: "{{ lab_dir }}/lab-ca.crt"
+    status_code: "{{ item.status }}"
+    follow_redirects: none
+  loop:
+    - { url: "http://hello.{{ lab_domain }}/", status: 200 }
+    - { url: "https://hello.{{ lab_domain }}/", status: 200 }
+    - { url: "http://grafana.{{ lab_domain }}/", status: 301 }
+    - { url: "https://grafana.{{ lab_domain }}/api/health", status: 200 }
+    - { url: "https://prometheus.{{ lab_domain }}/-/ready", status: 401 }
+    - { url: "https://alertmanager.{{ lab_domain }}/-/ready", status: 401 }
+    - { url: "https://logs.{{ lab_domain }}/", status: 401 }
+  register: platform_gateway_ready
+  until: platform_gateway_ready.status == item.status
+  retries: 30
+  delay: 5
+  when: manage_etc_hosts | bool
+
 - name: Deployment summary
   ansible.builtin.debug:
     msg:
       - "Gateway address : {{ platform_gateway_address_final.stdout | trim }}"
       - "App (HTTP)      : curl http://hello.{{ lab_domain }}/"
-      - "App (HTTPS)     : curl --cacert ca.crt https://hello.{{ lab_domain }}/   (CA: make ca)"
+      - "App (HTTPS)     : curl --cacert {{ lab_dir }}/lab-ca.crt https://hello.{{ lab_domain }}/"
       - "Grafana         : https://grafana.{{ lab_domain }}   (user admin, password: make credentials)"
       - "Prometheus      : https://prometheus.{{ lab_domain }}   (basic auth, make credentials)"
       - "Logs (OSD)      : https://logs.{{ lab_domain }}   (basic auth, make credentials)"

@@ -41,24 +41,29 @@ HTTP-запроса в OpenSearch. Тот же сценарий на кажды�
 
 ## 1. Архитектура
 
+![Архитектура kube-gateway-lab](docs/img/architecture.png)
+
+<details>
+<summary>Та же схема в Mermaid</summary>
+
 ```mermaid
 flowchart LR
     user([Пользователь / curl]) -->|HTTP :80 / HTTPS :443<br/>*.lab.test| lb
 
-    subgraph node[Ubuntu 24.04 - kubeadm v1.36.5 - containerd 2.2 - Calico]
+    subgraph cluster[Ubuntu 24.04 - kubeadm v1.36.5 - containerd 2.2 - Calico]
       lb[MetalLB L2<br/>IP узла] --> envoy
 
-      subgraph edge[Gateway API]
+      subgraph gwapi[Gateway API]
         gc[GatewayClass envoy-gateway] -.-> gw[Gateway edge/public<br/>listeners http/https]
         envoy[Envoy proxy x2<br/>Envoy Gateway v1.9.2]
-        gw -.программирует.-> envoy
+        gw -. программирует .-> envoy
       end
 
       envoy -->|HTTPRoute hello<br/>90%| v1[hello-v1<br/>nginx + exporter<br/>HPA 2..5]
       envoy -->|10% / X-Canary / /v2| v2[hello-v2<br/>canary]
       envoy -->|basic auth| ui[Grafana / Prometheus /<br/>Alertmanager / OSD]
 
-      subgraph mon[monitoring]
+      subgraph monitoring[monitoring]
         prom[(Prometheus)] --> graf[Grafana]
         prom --> am[Alertmanager]
       end
@@ -67,7 +72,7 @@ flowchart LR
       prom -.scrape.-> fd
       prom -.scrape.-> cp[kube-apiserver, etcd,<br/>scheduler, controller-manager,<br/>kubelet, node-exporter, KSM]
 
-      subgraph log[logging]
+      subgraph logging[logging]
         fd[Fluentd DaemonSet] -->|bulk| os[(OpenSearch)]
         os --> osd[OpenSearch Dashboards]
       end
@@ -76,6 +81,8 @@ flowchart LR
       cm[cert-manager<br/>lab CA → *.lab.test] -.TLS secret.-> gw
     end
 ```
+
+</details>
 
 **Поток запроса.** Клиент обращается к `hello.lab.test`. MetalLB анонсирует IP узла для Service
 типа LoadBalancer, за которым стоит Envoy. Envoy терминирует TLS, затем по `HTTPRoute`
@@ -207,6 +214,7 @@ curl -H 'Host: hello.lab.test' http://$GW/
 
 # 2. HTTPS: сертификат выпущен cert-manager и проверяется собственным CA
 sudo make ca && curl --cacert lab-ca.crt https://hello.lab.test/
+curl --cacert /opt/kube-gateway-lab/lab-ca.crt https://hello.lab.test/   # тот же CA, сохранён деплоем
 
 # 3. Заголовки ответа: версия backend, pod и фильтр ResponseHeaderModifier
 curl -sI http://hello.lab.test/ | grep -Ei 'x-app-version|x-pod|x-served-via'

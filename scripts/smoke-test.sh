@@ -107,22 +107,52 @@ done < <("$KUBECTL" get httproute -A -o jsonpath='{range .items[*]}{.metadata.na
 
 "$KUBECTL" -n cert-manager get secret lab-root-ca -o jsonpath='{.data.ca\.crt}' | base64 -d >"$TMP/ca.crt"
 
-body=$(retry 10 3 gw_curl hello http / || true)
+# The data plane is eventually consistent: Envoy receives new routes/policies over xDS
+# a few seconds after they are applied, so every HTTP expectation is retried (<= 60s).
+# eventually <expected> <cmd...>  -> prints the last output of cmd
+eventually() {
+  local want=$1 out="" i
+  shift
+  for ((i = 1; i <= 20; i++)); do
+    out=$("$@" 2>/dev/null) || true
+    [[ $out == "$want" ]] && break
+    sleep 3
+  done
+  printf '%s' "$out"
+}
+served_via()   { gw_curl hello http -D - -o /dev/null / | tr -d '\r' | grep -i '^x-served-via:'; }
+version_of()   { gw_curl hello http "${@:1:$#-1}" "${*: -1}" | jq -r .version; }
+http_code()    { local h=$1 sc=$2; shift 2; gw_curl "$h" "$sc" -o /dev/null -w '%{http_code}' "$@"; }
+
+body=$(eventually "Hello World!" gw_curl hello http /)
 [[ $body == "Hello World!" ]] && ok "HTTP  http://hello.$DOMAIN/ -> \"$body\"" || fail "HTTP  http://hello.$DOMAIN/ returned \"$body\""
 
-body=$(gw_curl hello https / || true)
-[[ $body == "Hello World!" ]] && ok "HTTPS https://hello.$DOMAIN/ -> \"$body\" (certificate verified with the lab CA)" \
-  || fail "HTTPS https://hello.$DOMAIN/ returned \"$body\""
+body=$(eventually "Hello World!" gw_curl hello https /)
+[[ $body == "Hello World!" ]] && ok "HTTPS https://hello.$DOMAIN/ -> \"$body\" (certificate verified with the lab CA)" || fail "HTTPS https://hello.$DOMAIN/ returned \"$body\""
 
-hdr=$(gw_curl hello http -D - -o /dev/null / | tr -d '\r' | grep -i '^x-served-via:' || true)
+hdr=$(eventually "x-served-via: envoy-gateway" served_via)
 [[ $hdr == *envoy-gateway* ]] && ok "ResponseHeaderModifier filter adds '$hdr'" || fail "X-Served-Via header missing"
 
-v=$(gw_curl hello http -H 'X-Canary: always' /info | jq -r .version 2>/dev/null || true)
+v=$(eventually v2 version_of -H 'X-Canary: always' /info)
 [[ $v == v2 ]] && ok "header match: 'X-Canary: always' -> $v" || fail "header match returned '$v'"
 
-v1=$(gw_curl hello http /v1/info | jq -r .version 2>/dev/null || true)
-v2=$(gw_curl hello http /v2/info | jq -r .version 2>/dev/null || true)
+v1=$(eventually v1 version_of /v1/info)
+v2=$(eventually v2 version_of /v2/info)
 [[ $v1 == v1 && $v2 == v2 ]] && ok "path match + URLRewrite: /v1/info -> $v1, /v2/info -> $v2" || fail "path routing: /v1 -> '$v1', /v2 -> '$v2'"
+
+loc=$(eventually "301 https://grafana.$DOMAIN/" gw_curl grafana http -o /dev/null -w '%{http_code} %{redirect_url}' /)
+[[ $loc == "301 https://grafana.$DOMAIN/" ]] && ok "HTTP->HTTPS redirect for operator UIs: $loc" || fail "redirect returned '$loc'"
+
+code=$(eventually 401 http_code prometheus https /-/ready)
+[[ $code == 401 ]] && ok "SecurityPolicy basic auth: prometheus without credentials -> $code" || fail "prometheus without credentials -> $code (expected 401)"
+if [[ -r $SECRETS_DIR/ui-basic-auth-password ]]; then
+  code=$(eventually 200 http_code prometheus https -u "admin:$(cat "$SECRETS_DIR/ui-basic-auth-password")" /-/ready)
+  [[ $code == 200 ]] && ok "SecurityPolicy basic auth: prometheus with credentials -> $code" || fail "prometheus with credentials -> $code"
+fi
+code=$(eventually 200 http_code grafana https /api/health)
+[[ $code == 200 ]] && ok "Grafana published at https://grafana.$DOMAIN -> $code" || fail "Grafana via Gateway -> $code"
+code=$(eventually 401 http_code logs https /)
+[[ $code == 401 ]] && ok "OpenSearch Dashboards published at https://logs.$DOMAIN, protected (401 without credentials)" || fail "logs.$DOMAIN -> $code"
 
 total=200
 canary=0
@@ -135,18 +165,6 @@ else fail "traffic split: $canary/$total (${pct}%) served by v2, expected ~10%";
 
 codes=$(for _ in $(seq 25); do gw_curl hello http -o /dev/null -w '%{http_code}\n' /limited; done | sort | uniq -c | tr '\n' ' ')
 [[ $codes == *429* && $codes == *200* ]] && ok "local rate limit on /limited (5 rps): $codes" || fail "rate limit not observed: $codes"
-
-loc=$(gw_curl grafana http -o /dev/null -w '%{http_code} %{redirect_url}' / || true)
-[[ $loc == "301 https://grafana.$DOMAIN/" ]] && ok "HTTP->HTTPS redirect for operator UIs: $loc" || fail "redirect returned '$loc'"
-
-code=$(gw_curl prometheus https -o /dev/null -w '%{http_code}' /-/ready || true)
-[[ $code == 401 ]] && ok "SecurityPolicy basic auth: prometheus without credentials -> $code" || fail "prometheus without credentials -> $code (expected 401)"
-if [[ -r $SECRETS_DIR/ui-basic-auth-password ]]; then
-  code=$(gw_curl prometheus https -u "admin:$(cat "$SECRETS_DIR/ui-basic-auth-password")" -o /dev/null -w '%{http_code}' /-/ready || true)
-  [[ $code == 200 ]] && ok "SecurityPolicy basic auth: prometheus with credentials -> $code" || fail "prometheus with credentials -> $code"
-fi
-code=$(gw_curl grafana https -o /dev/null -w '%{http_code}' /api/health || true)
-[[ $code == 200 ]] && ok "Grafana published at https://grafana.$DOMAIN -> $code" || fail "Grafana via Gateway -> $code"
 
 # ---------------------------------------------------------------------------
 section "Monitoring (Prometheus)"

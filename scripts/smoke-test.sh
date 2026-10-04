@@ -6,6 +6,8 @@
 # Checks the cluster, every Gateway API feature, Prometheus targets/queries and
 # that a request made through the Gateway shows up in OpenSearch (Fluentd pipeline).
 # Exit code is non-zero if any check fails. Read-only except for HTTP test traffic.
+# ok() always returns 0, so `cond && ok ... || fail ...` is a safe if/else here
+# shellcheck disable=SC2015
 set -Eeuo pipefail
 
 DOMAIN="${LAB_DOMAIN:-lab.test}"

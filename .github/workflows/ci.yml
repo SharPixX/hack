@@ -50,7 +50,11 @@ jobs:
       - name: Lint and validate manifests
         env:
           ANSIBLE_COLLECTIONS_PATH: ${{ github.workspace }}/.ansible/collections
-        run: ./scripts/lint.sh
+        run: ./scripts/lint.sh 2>&1 | tee lint.log
+
+      - name: Publish lint failure details as annotations
+        if: failure()
+        run: ./scripts/ci-annotate.sh lint.log "lint" 200
 
       - name: Secret scan (gitleaks)
         run: gitleaks dir --redact --verbose .
@@ -60,7 +64,6 @@ jobs:
 
   e2e:
     name: E2E - kubeadm cluster on Ubuntu 24.04
-    needs: lint
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -114,6 +117,14 @@ jobs:
         run: |
           sudo ./scripts/collect-diagnostics.sh diagnostics || true
           sudo chown -R "$(id -u):$(id -g)" diagnostics || true
+
+      - name: Publish failure details as annotations
+        if: failure()
+        run: |
+          for f in smoke.log deploy-2.log deploy-1.log; do
+            if [[ -s $f ]]; then ./scripts/ci-annotate.sh "$f" "$f" 150; break; fi
+          done
+          ./scripts/ci-annotate.sh diagnostics/pods.txt "pods" 60
 
       - name: Upload logs and diagnostics
         if: always()

@@ -183,13 +183,27 @@ def page1():
                                            "таргеты — ServiceMonitor/PodMonitor"],
         ["ОС, на которой тестировалось", "<b>Ubuntu 24.04 LTS</b>: e2e-деплой на чистом раннере GitHub Actions ubuntu-24.04 "
                                          "(x86_64, 4 vCPU/16 GB) на каждый push — двойной прогон + smoke-test. "
-                                         "Результат: <b>56/56 проверок PASS</b>, повторный деплой failed=0 "
+                                         "Результат: <b>56/56 проверок PASS</b>, повторный деплой changed=0, failed=0 "
                                          "(docs/e2e-results.md)"],
     ]
     s.append(table(rows, [44 * mm, 136 * mm]))
     s.append(Spacer(1, 5))
     s.append(Paragraph("Архитектурная схема: пользователь → Gateway API → приложение, мониторинг и логирование", H2))
     s.append(diagram())
+    s.append(Paragraph("Проверка за минуту (на узле Ubuntu 24.04)", H2))
+    cmds = [
+        ["git clone https://github.com/SharPixX/hack.git && cd hack && sudo ./deploy.sh",
+         "развернуть всё; в конце — smoke-test (56 проверок)"],
+        ["curl http://hello.lab.test/", "Hello World! через Gateway API"],
+        ["curl --cacert /opt/kube-gateway-lab/lab-ca.crt https://hello.lab.test/", "то же по HTTPS (свой CA)"],
+        ["sudo make verify  |  sudo make credentials", "повторная проверка  |  адреса UI и пароли"],
+    ]
+    data = [[Paragraph(f"<font face='Courier'>{c}</font>", CELL), Paragraph(d, CELL)] for c, d in cmds]
+    t = Table(data, colWidths=[112 * mm, 68 * mm])
+    t.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.4, GRID), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                           ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f8fafc")),
+                           ("TOPPADDING", (0, 0), (-1, -1), 2), ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5)]))
+    s.append(t)
     return s
 
 

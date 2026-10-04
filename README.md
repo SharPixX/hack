@@ -16,7 +16,7 @@ sudo ./deploy.sh          # ≈12–20 минут (зависит от сети)
 Gateway API, TLS, canary, rate limit, цели и запросы Prometheus, а также доставку конкретного
 HTTP-запроса в OpenSearch. Тот же сценарий на каждый push выполняется в GitHub Actions на
 раннере **ubuntu-24.04**: два деплоя подряд (проверка идемпотентности), затем smoke-test.
-Результат последнего прогона — **56/56 PASS, повторный деплой `failed=0`**. Полный вывод:
+Результат последнего прогона — **56/56 PASS, повторный деплой `changed=0 failed=0`**. Полный вывод:
 [`docs/e2e-results.md`](docs/e2e-results.md), прогоны: вкладка [Actions](https://github.com/SharPixX/hack/actions).
 
 ---

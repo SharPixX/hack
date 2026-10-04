@@ -41,17 +41,18 @@ jobs:
 
       - name: Install linters and Kubernetes tooling (pinned)
         run: |
-          pip install --quiet -r requirements-dev.txt
+          CURL="curl --retry 5 --retry-all-errors -fsSL"
+          pip install --quiet --retries 5 -r requirements-dev.txt
           ansible-galaxy collection install -r ansible/requirements.yml -p .ansible/collections
-          curl -fsSL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" \
+          $CURL "https://get.helm.sh/helm-v${HELM_VERSION}-linux-amd64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin --strip-components=1 linux-amd64/helm
-          curl -fsSL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
+          $CURL "https://github.com/yannh/kubeconform/releases/download/v${KUBECONFORM_VERSION}/kubeconform-linux-amd64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin kubeconform
           KZ="https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv${KUSTOMIZE_VERSION}"
-          curl -fsSL "${KZ}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
-          curl -fsSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+          $CURL "${KZ}/kustomize_v${KUSTOMIZE_VERSION}_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
+          $CURL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
             | sudo tar -xz -C /usr/local/bin gitleaks
-          curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+          $CURL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
             | sudo tar -xz -C /usr/local/bin trivy
 
       - name: Lint and validate manifests
